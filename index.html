@@ -110,22 +110,40 @@
       
       // 動的なファイル名に基づいて外部読み込みタグを削除する
       if (cssFilename) {
-        const cssRegex = new RegExp(`<link[^>]*href=["']${escapeRegExp(cssFilename)}["'][^>]*>\\n?`, 'gi');
+        // ./style.css などのパス付きにも対応
+        const cssRegex = new RegExp(`<link[^>]*href=["'][^"']*?(?:\\/)?${escapeRegExp(cssFilename)}["'][^>]*>\\n?`, 'gi');
         result = result.replace(cssRegex, '');
       }
       
       jsList.forEach(js => {
         if (js.filename) {
-          const jsRegex = new RegExp(`<script[^>]*src=["']${escapeRegExp(js.filename)}["'][^>]*><\\/script>\\n?`, 'gi');
+          // type="module" や ./app.js などのパス付きスクリプトタグも確実に削除
+          const jsRegex = new RegExp(`<script[^>]*src=["'][^"']*?(?:\\/)?${escapeRegExp(js.filename)}["'][^>]*><\\/script>\\n?`, 'gi');
           result = result.replace(jsRegex, '');
         }
       });
       
       const combinedJs = jsList.map(j => {
         let content = j.content.trim();
-        // 複数行にまたがる import ... from '...' や import '...' を削除
-        content = content.replace(/import\s+(?:[\w\s{},*]+)\s+from\s+['"][^'"]+['"]\s*;?/g, '');
+        
+        // --- モジュール構文 (import/export) の削除・無害化をさらに強化 ---
+        
+        // 1. import文の削除
+        content = content.replace(/import\s+[\s\S]*?from\s+['"][^'"]+['"]\s*;?/g, '');
         content = content.replace(/import\s+['"][^'"]+['"]\s*;?/g, '');
+        
+        // 2. export文の無害化・削除
+        // export { ... } [from '...']; を丸ごと削除
+        content = content.replace(/export\s+\{[\s\S]*?\}\s*(?:from\s+['"][^'"]+['"]\s*)?;?/g, '');
+        // export * from '...'; を丸ごと削除
+        content = content.replace(/export\s+\*\s+from\s+['"][^'"]+['"]\s*;?/g, '');
+        // export default を削除
+        content = content.replace(/export\s+default\s+/g, '');
+        // export async function などの修飾子付きに対応
+        content = content.replace(/export\s+(async\s+function)\b/g, '$1');
+        // 基本的な export 宣言の修飾子 (const, let, var, function, class) を削除して中身を残す
+        content = content.replace(/export\s+(const|let|var|function|class)\b/g, '$1');
+
         return content.trim();
       }).filter(Boolean).join('\n\n');
 
@@ -156,7 +174,7 @@
       <i className={`${name} ${className}`} style={{ fontSize: size }}></i>
     );
 
-    const EditorPanel = ({ label, iconName, value, onChange, readOnly, placeholder, className = "", filename, onFilenameChange, onImport, accept, showRemove, onRemove }) => {
+    const EditorPanel = ({ label, iconName, value, onChange, readOnly, placeholder, className = "", filename, onFilenameChange, onImport, accept, showRemove, onRemove, showMoveUp, onMoveUp, showMoveDown, onMoveDown }) => {
       const [copied, setCopied] = useState(false);
       const fileInputRef = useRef(null);
 
@@ -200,6 +218,24 @@
               )}
             </div>
             <div className="flex items-center gap-1">
+              {showMoveUp && (
+                <button
+                  onClick={onMoveUp}
+                  className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
+                  title="上に移動"
+                >
+                  <Icon name="fa-solid fa-arrow-up" />
+                </button>
+              )}
+              {showMoveDown && (
+                <button
+                  onClick={onMoveDown}
+                  className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
+                  title="下に移動"
+                >
+                  <Icon name="fa-solid fa-arrow-down" />
+                </button>
+              )}
               {onImport && (
                 <>
                   <input type="file" accept={accept} onChange={handleFileChange} ref={fileInputRef} className="hidden" />
@@ -298,6 +334,18 @@
         setInputSplitJsList(prev => prev.filter(item => item.id !== id));
       };
 
+      const moveJsPanel = (index, direction) => {
+        setInputSplitJsList(prev => {
+          const newList = [...prev];
+          if (direction === 'up' && index > 0) {
+            [newList[index - 1], newList[index]] = [newList[index], newList[index - 1]];
+          } else if (direction === 'down' && index < newList.length - 1) {
+            [newList[index], newList[index + 1]] = [newList[index + 1], newList[index]];
+          }
+          return newList;
+        });
+      };
+
       const handleModeToggle = (newMode) => {
         if (newMode === mode) return;
 
@@ -353,6 +401,93 @@
           });
         }
         e.target.value = null; // リセット
+      };
+
+      // 結合モード：JSの自動並び替え処理 (import文を解析して依存関係順にソート)
+      const handleAutoSortJs = () => {
+        if (inputSplitJsList.length <= 1) return;
+
+        const nodes = new Map();
+        // データの初期化 (ファイル名をキーにして情報を保持)
+        inputSplitJsList.forEach(js => {
+          // JSのファイル名が重複していると上書きされるため、ユニークな識別子にする
+          nodes.set(js.filename, { item: js, dependencies: [] });
+        });
+
+        const importRegex = /import\s+[\s\S]*?from\s+['"]([^'"]+)['"]/g;
+        const importRegex2 = /import\s+['"]([^'"]+)['"]/g;
+
+        // 依存関係の抽出
+        inputSplitJsList.forEach(js => {
+          const deps = new Set();
+          let match;
+          const content = js.content;
+          
+          while ((match = importRegex.exec(content)) !== null) {
+            const depFilename = match[1].split('/').pop(); // './core.js' -> 'core.js'
+            if (nodes.has(depFilename)) deps.add(depFilename);
+          }
+          
+          while ((match = importRegex2.exec(content)) !== null) {
+            const depFilename = match[1].split('/').pop();
+            if (nodes.has(depFilename)) deps.add(depFilename);
+          }
+
+          const node = nodes.get(js.filename);
+          deps.forEach(depFilename => {
+            if (depFilename !== js.filename) { // 自己依存を防ぐ
+              node.dependencies.push(depFilename);
+            }
+          });
+        });
+
+        // トポロジカルソート用グラフの構築
+        const graph = new Map();
+        const inDegree = new Map();
+        nodes.forEach((_, filename) => {
+          graph.set(filename, []);
+          inDegree.set(filename, 0);
+        });
+
+        // 依存先(A)が依存元(B)より先に来る必要がある -> エッジは A から B へ引く
+        nodes.forEach((node, filename) => {
+          node.dependencies.forEach(dep => {
+            if (graph.has(dep)) {
+              graph.get(dep).push(filename);
+              inDegree.set(filename, inDegree.get(filename) + 1);
+            }
+          });
+        });
+
+        const queue = [];
+        inDegree.forEach((degree, filename) => {
+          if (degree === 0) queue.push(filename);
+        });
+
+        const sortedFilenames = [];
+        while (queue.length > 0) {
+          const current = queue.shift();
+          sortedFilenames.push(current);
+          graph.get(current).forEach(neighbor => {
+            inDegree.set(neighbor, inDegree.get(neighbor) - 1);
+            if (inDegree.get(neighbor) === 0) {
+              queue.push(neighbor);
+            }
+          });
+        }
+
+        // 循環参照等によりソートできなかったファイルがある場合は末尾に追加
+        const sortedSet = new Set(sortedFilenames);
+        inputSplitJsList.forEach(js => {
+          if (!sortedSet.has(js.filename)) {
+            sortedFilenames.push(js.filename);
+            console.warn(`[Auto Sort] 循環依存の可能性があります: ${js.filename}`);
+          }
+        });
+
+        // ソート結果を反映
+        const sortedList = sortedFilenames.map(filename => nodes.get(filename).item);
+        setInputSplitJsList(sortedList);
       };
 
       const derivedDecomposed = mode === 'decompose' 
@@ -478,14 +613,25 @@
                   <div className="flex flex-col gap-4 h-full overflow-y-auto pr-2 pb-2">
                     <div className="flex items-center justify-between pb-1">
                       <span className="text-sm font-bold text-gray-700">結合するファイル群</span>
-                      <button
-                        onClick={() => bulkInputRef.current?.click()}
-                        className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-md transition-colors shadow-sm"
-                        title="複数ファイルをまとめて読み込みます"
-                      >
-                        <Icon name="fa-solid fa-file-import" />
-                        一括インポート
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={handleAutoSortJs}
+                          disabled={inputSplitJsList.length <= 1}
+                          className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-blue-500 hover:bg-blue-600 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+                          title="JSのimport文を解析して依存関係の順に並び替えます"
+                        >
+                          <Icon name="fa-solid fa-wand-magic-sparkles" />
+                          自動並び替え
+                        </button>
+                        <button
+                          onClick={() => bulkInputRef.current?.click()}
+                          className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-md transition-colors shadow-sm"
+                          title="複数ファイルをまとめて読み込みます"
+                        >
+                          <Icon name="fa-solid fa-file-import" />
+                          一括インポート
+                        </button>
+                      </div>
                       <input type="file" multiple accept=".html,.css,.js,.txt" onChange={handleBulkImport} className="hidden" ref={bulkInputRef} />
                     </div>
 
@@ -518,7 +664,7 @@
                       className="min-h-[250px] flex-shrink-0"
                     />
                     
-                    {inputSplitJsList.map((jsItem) => (
+                    {inputSplitJsList.map((jsItem, index) => (
                       <EditorPanel
                         key={jsItem.id}
                         filename={jsItem.filename}
@@ -533,6 +679,10 @@
                         accept=".js,.txt"
                         showRemove={inputSplitJsList.length > 1}
                         onRemove={() => removeJsPanel(jsItem.id)}
+                        showMoveUp={index > 0}
+                        onMoveUp={() => moveJsPanel(index, 'up')}
+                        showMoveDown={index < inputSplitJsList.length - 1}
+                        onMoveDown={() => moveJsPanel(index, 'down')}
                         placeholder="JavaScriptコードを入力..."
                         className="min-h-[250px] flex-shrink-0"
                       />
