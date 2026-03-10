@@ -1,383 +1,388 @@
-import React, { useState, useEffect } from 'react';
-import { FileCode2, FileType2, FileJson, ArrowRightLeft, Copy, Check, Split, Combine, Download, DownloadCloud } from 'lucide-react';
-
-// --- Utility Functions ---
-
-// クリップボードへのコピー
-const copyToClipboard = (text) => {
-  const textArea = document.createElement("textarea");
-  textArea.value = text;
-  // 画面スクロールを防ぐためのスタイル
-  textArea.style.top = "0";
-  textArea.style.left = "0";
-  textArea.style.position = "fixed";
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HTML ToolKit</title>
   
-  document.body.appendChild(textArea);
-  textArea.focus();
-  textArea.select();
-  try {
-    document.execCommand('copy');
-  } catch (err) {
-    console.error('コピーに失敗しました', err);
-  }
-  document.body.removeChild(textArea);
-};
-
-// ファイルダウンロード機能
-const downloadFile = (filename, content) => {
-  if (!content) return;
-  const element = document.createElement("a");
-  const file = new Blob([content], { type: 'text/plain' });
-  element.href = URL.createObjectURL(file);
-  element.download = filename;
-  document.body.appendChild(element);
-  element.click();
-  document.body.removeChild(element);
-};
-
-// HTMLからCSSとJSを抽出して分解する
-const decomposeHtml = (source) => {
-  let css = [];
-  let js = [];
-  let html = source || '';
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
   
-  // <style>タグの抽出
-  html = html.replace(/<style[^>]*>([\s\S]*?)<\/style>/gi, (match, p1) => {
-    if (p1.trim()) css.push(p1.trim());
-    return ''; // HTMLから削除
-  });
-
-  // <script>タグの抽出（src属性を持たないインラインスクリプトのみ対象）
-  html = html.replace(/<script(?:(?!\bsrc=)[^>])*>([\s\S]*?)<\/script>/gi, (match, p1) => {
-    if (p1.trim()) js.push(p1.trim());
-    return ''; // HTMLから削除
-  });
-
-  const finalCss = css.join('\n\n').trim();
-  const finalJs = js.join('\n\n').trim();
-
-  // CSSが抽出された場合、読み込みタグを挿入
-  if (finalCss) {
-    const linkTag = `<link rel="stylesheet" href="style.css">`;
-    if (html.match(/<\/head>/i)) {
-      html = html.replace(/<\/head>/i, `  ${linkTag}\n</head>`);
-    } else {
-      html = `${linkTag}\n${html}`;
-    }
-  }
-
-  // JSが抽出された場合、読み込みタグを挿入
-  if (finalJs) {
-    const scriptTag = `<script src="script.js"></script>`;
-    if (html.match(/<\/body>/i)) {
-      html = html.replace(/<\/body>/i, `  ${scriptTag}\n</body>`);
-    } else {
-      html = `${html}\n${scriptTag}`;
-    }
-  }
-
-  return {
-    html: html.trim(),
-    css: finalCss,
-    js: finalJs
-  };
-};
-
-// HTML, CSS, JSを1つのHTMLに結合する
-const composeHtml = (html, css, js) => {
-  let result = html || '';
+  <!-- FontAwesome (アイコン用) -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   
-  // 結合時に外部読み込みタグ(style.css, script.js)が含まれていれば削除する
-  result = result.replace(/<link[^>]*href=["']style\.css["'][^>]*>\n?/gi, '');
-  result = result.replace(/<script[^>]*src=["']script\.js["'][^>]*><\/script>\n?/gi, '');
+  <!-- React & ReactDOM -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   
-  if (css && css.trim()) {
-    const styleTag = `<style>\n${css.trim()}\n</style>`;
-    // </head>があればその前に、なければ先頭に挿入
-    if (result.match(/<\/head>/i)) {
-      result = result.replace(/<\/head>/i, `${styleTag}\n</head>`);
-    } else {
-      result = `${styleTag}\n${result}`;
-    }
-  }
+  <!-- Babel (ブラウザ内でJSXをコンパイルするため) -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body>
+  <div id="root"></div>
 
-  if (js && js.trim()) {
-    const scriptTag = `<script>\n${js.trim()}\n</script>`;
-    // </body>があればその前に、なければ末尾に挿入
-    if (result.match(/<\/body>/i)) {
-      result = result.replace(/<\/body>/i, `${scriptTag}\n</body>`);
-    } else {
-      result = `${result}\n${scriptTag}`;
-    }
-  }
+  <script type="text/babel">
+    const { useState, useEffect } = React;
 
-  return result.trim();
-};
+    // --- Utility Functions ---
 
-// --- Components ---
+    // クリップボードへのコピー
+    const copyToClipboard = (text) => {
+      const textArea = document.createElement("textarea");
+      textArea.value = text;
+      textArea.style.top = "0";
+      textArea.style.left = "0";
+      textArea.style.position = "fixed";
+      
+      document.body.appendChild(textArea);
+      textArea.focus();
+      textArea.select();
+      try {
+        document.execCommand('copy');
+      } catch (err) {
+        console.error('コピーに失敗しました', err);
+      }
+      document.body.removeChild(textArea);
+    };
 
-// エディタパネルコンポーネント
-const EditorPanel = ({ title, icon: Icon, value, onChange, readOnly, placeholder, className = "", filename }) => {
-  const [copied, setCopied] = useState(false);
+    // ファイルダウンロード機能
+    const downloadFile = (filename, content) => {
+      if (!content) return;
+      const element = document.createElement("a");
+      const file = new Blob([content], { type: 'text/plain' });
+      element.href = URL.createObjectURL(file);
+      element.download = filename;
+      document.body.appendChild(element);
+      element.click();
+      document.body.removeChild(element);
+    };
 
-  const handleCopy = () => {
-    if (!value) return;
-    copyToClipboard(value);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
+    // HTMLからCSSとJSを抽出して分解する
+    const decomposeHtml = (source) => {
+      let css = [];
+      let js = [];
+      let html = source || '';
+      
+      html = html.replace(/<style[^>]*>([\s\S]*?)<\/style>/gi, (match, p1) => {
+        if (p1.trim()) css.push(p1.trim());
+        return '';
+      });
 
-  const handleDownload = () => {
-    if (!value || !filename) return;
-    downloadFile(filename, value);
-  };
+      html = html.replace(/<script(?:(?!\bsrc=)[^>])*>([\s\S]*?)<\/script>/gi, (match, p1) => {
+        if (p1.trim()) js.push(p1.trim());
+        return '';
+      });
 
-  return (
-    <div className={`flex flex-col bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden ${className}`}>
-      {/* ヘッダー */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/50">
-        <div className="flex items-center gap-2 text-gray-700 dark:text-gray-300 font-medium">
-          <Icon size={18} className="text-blue-500" />
-          {title}
-        </div>
-        <div className="flex items-center gap-1">
-          {filename && (
-            <button
-              onClick={handleDownload}
-              disabled={!value}
-              className="p-1.5 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              title={`${filename} としてダウンロード`}
-            >
-              <Download size={16} />
-            </button>
-          )}
-          <button
-            onClick={handleCopy}
-            disabled={!value}
-            className="p-1.5 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            title="クリップボードにコピー"
-          >
-            {copied ? <Check size={16} className="text-green-500" /> : <Copy size={16} />}
-          </button>
-        </div>
-      </div>
-      {/* テキストエリア */}
-      <textarea
-        value={value}
-        onChange={(e) => onChange && onChange(e.target.value)}
-        readOnly={readOnly}
-        placeholder={placeholder}
-        spellCheck={false}
-        className={`flex-1 w-full p-4 font-mono text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500/50 bg-transparent text-gray-800 dark:text-gray-100 ${readOnly ? 'bg-gray-50/30 dark:bg-gray-900/30' : ''}`}
-      />
-    </div>
-  );
-};
+      const finalCss = css.join('\n\n').trim();
+      const finalJs = js.join('\n\n').trim();
 
-// --- Main App Component ---
+      if (finalCss) {
+        const linkTag = `<link rel="stylesheet" href="style.css">`;
+        if (html.match(/<\/head>/i)) {
+          html = html.replace(/<\/head>/i, `  ${linkTag}\n</head>`);
+        } else {
+          html = `${linkTag}\n${html}`;
+        }
+      }
 
-export default function App() {
-  const [mode, setMode] = useState('decompose'); // 'decompose' or 'compose'
+      if (finalJs) {
+        const scriptTag = `<script src="script.js"><\/script>`;
+        if (html.match(/<\/body>/i)) {
+          html = html.replace(/<\/body>/i, `  ${scriptTag}\n</body>`);
+        } else {
+          html = `${html}\n${scriptTag}`;
+        }
+      }
 
-  // マスター入力ステート
-  const [inputCombined, setInputCombined] = useState('');
+      return {
+        html: html.trim(),
+        css: finalCss,
+        js: finalJs
+      };
+    };
 
-  const [inputSplitHtml, setInputSplitHtml] = useState('');
-  const [inputSplitCss, setInputSplitCss] = useState('');
-  const [inputSplitJs, setInputSplitJs] = useState('');
+    // HTML, CSS, JSを1つのHTMLに結合する
+    const composeHtml = (html, css, js) => {
+      let result = html || '';
+      
+      result = result.replace(/<link[^>]*href=["']style\.css["'][^>]*>\n?/gi, '');
+      result = result.replace(/<script[^>]*src=["']script\.js["'][^>]*><\/script>\n?/gi, '');
+      
+      if (css && css.trim()) {
+        const styleTag = `<style>\n${css.trim()}\n<\/style>`;
+        if (result.match(/<\/head>/i)) {
+          result = result.replace(/<\/head>/i, `${styleTag}\n</head>`);
+        } else {
+          result = `${styleTag}\n${result}`;
+        }
+      }
 
-  // 初回マウント時に初期値を分解しておく
-  useEffect(() => {
-    const decomposed = decomposeHtml(inputCombined);
-    setInputSplitHtml(decomposed.html);
-    setInputSplitCss(decomposed.css);
-    setInputSplitJs(decomposed.js);
-  }, []);
+      if (js && js.trim()) {
+        const scriptTag = `<script>\n${js.trim()}\n<\/script>`;
+        if (result.match(/<\/body>/i)) {
+          result = result.replace(/<\/body>/i, `${scriptTag}\n</body>`);
+        } else {
+          result = `${result}\n${scriptTag}`;
+        }
+      }
 
-  // モード切り替え時の処理（状態の引き継ぎ）
-  const handleModeToggle = (newMode) => {
-    if (newMode === mode) return;
+      return result.trim();
+    };
 
-    if (newMode === 'compose') {
-      // 分解結果を入力値としてセットする
-      const decomposed = decomposeHtml(inputCombined);
-      setInputSplitHtml(decomposed.html);
-      setInputSplitCss(decomposed.css);
-      setInputSplitJs(decomposed.js);
-    } else {
-      // 結合結果を入力値としてセットする
-      const composed = composeHtml(inputSplitHtml, inputSplitCss, inputSplitJs);
-      setInputCombined(composed);
-    }
-    setMode(newMode);
-  };
+    // --- Components ---
 
-  // 派生ステート（プレビュー用）
-  const derivedDecomposed = mode === 'decompose' ? decomposeHtml(inputCombined) : { html: '', css: '', js: '' };
-  const derivedComposed = mode === 'compose' ? composeHtml(inputSplitHtml, inputSplitCss, inputSplitJs) : '';
+    // アイコンコンポーネント
+    const Icon = ({ name, size = 16, className = "" }) => (
+      <i className={`${name} ${className}`} style={{ fontSize: size }}></i>
+    );
 
-  // 一括ダウンロード処理
-  const handleDownloadAll = () => {
-    // ブラウザの複数ダウンロードブロックを回避するため、少しずつ時間をずらしてダウンロードを実行
-    if (derivedDecomposed.html) downloadFile('index.html', derivedDecomposed.html);
-    if (derivedDecomposed.css) {
-      setTimeout(() => downloadFile('style.css', derivedDecomposed.css), 200);
-    }
-    if (derivedDecomposed.js) {
-      setTimeout(() => downloadFile('script.js', derivedDecomposed.js), 400);
-    }
-  };
+    // エディタパネルコンポーネント
+    const EditorPanel = ({ title, iconName, value, onChange, readOnly, placeholder, className = "", filename }) => {
+      const [copied, setCopied] = useState(false);
 
-  return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 p-4 md:p-8 font-sans transition-colors duration-200">
-      <div className="max-w-7xl mx-auto space-y-6">
-        
-        {/* Header & Controls */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-gray-900 dark:text-white flex items-center gap-3">
-              <FileCode2 className="text-blue-500" size={32} />
-              HTML ToolKit
-            </h1>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-              インラインHTMLの分解と、HTML/CSS/JSの結合を行うユーティリティ
-            </p>
+      const handleCopy = () => {
+        if (!value) return;
+        copyToClipboard(value);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      };
+
+      const handleDownload = () => {
+        if (!value || !filename) return;
+        downloadFile(filename, value);
+      };
+
+      return (
+        <div className={`flex flex-col bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden ${className}`}>
+          <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 bg-gray-50/50">
+            <div className="flex items-center gap-2 text-gray-700 font-medium">
+              <Icon name={iconName} size={16} className="text-blue-500" />
+              {title}
+            </div>
+            <div className="flex items-center gap-1">
+              {filename && (
+                <button
+                  onClick={handleDownload}
+                  disabled={!value}
+                  className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  title={`${filename} としてダウンロード`}
+                >
+                  <Icon name="fa-solid fa-download" />
+                </button>
+              )}
+              <button
+                onClick={handleCopy}
+                disabled={!value}
+                className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                title="クリップボードにコピー"
+              >
+                {copied ? <Icon name="fa-solid fa-check" className="text-green-500" /> : <Icon name="fa-regular fa-copy" />}
+              </button>
+            </div>
           </div>
-
-          {/* Mode Toggle */}
-          <div className="flex bg-gray-200/50 dark:bg-gray-800 p-1 rounded-lg border border-gray-200 dark:border-gray-700">
-            <button
-              onClick={() => handleModeToggle('decompose')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${
-                mode === 'decompose'
-                  ? 'bg-white dark:bg-gray-700 text-blue-600 dark:text-blue-400 shadow-sm'
-                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
-              }`}
-            >
-              <Split size={16} />
-              分解モード
-            </button>
-            <button
-              onClick={() => handleModeToggle('compose')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${
-                mode === 'compose'
-                  ? 'bg-white dark:bg-gray-700 text-blue-600 dark:text-blue-400 shadow-sm'
-                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
-              }`}
-            >
-              <Combine size={16} />
-              結合モード
-            </button>
-          </div>
+          <textarea
+            value={value}
+            onChange={(e) => onChange && onChange(e.target.value)}
+            readOnly={readOnly}
+            placeholder={placeholder}
+            spellCheck={false}
+            className={`flex-1 w-full p-4 font-mono text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500/50 bg-transparent text-gray-800 ${readOnly ? 'bg-gray-50/30' : ''}`}
+          />
         </div>
+      );
+    };
 
-        {/* Main Workspace */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-[calc(100vh-180px)] min-h-[600px]">
-          
-          {/* --- Decompose Mode View --- */}
-          {mode === 'decompose' && (
-            <>
-              {/* Left: Input */}
-              <EditorPanel
-                title="インライン HTML (入力)"
-                filename="index.html"
-                icon={FileCode2}
-                value={inputCombined}
-                onChange={setInputCombined}
-                placeholder="ここに <style> や <script> を含むHTMLを貼り付けてください..."
-                className="h-full"
-              />
+    // --- Main App Component ---
+
+    function App() {
+      const [mode, setMode] = useState('decompose');
+      const [inputCombined, setInputCombined] = useState('');
+      const [inputSplitHtml, setInputSplitHtml] = useState('');
+      const [inputSplitCss, setInputSplitCss] = useState('');
+      const [inputSplitJs, setInputSplitJs] = useState('');
+
+      useEffect(() => {
+        const decomposed = decomposeHtml(inputCombined);
+        setInputSplitHtml(decomposed.html);
+        setInputSplitCss(decomposed.css);
+        setInputSplitJs(decomposed.js);
+      }, []);
+
+      const handleModeToggle = (newMode) => {
+        if (newMode === mode) return;
+
+        if (newMode === 'compose') {
+          const decomposed = decomposeHtml(inputCombined);
+          setInputSplitHtml(decomposed.html);
+          setInputSplitCss(decomposed.css);
+          setInputSplitJs(decomposed.js);
+        } else {
+          const composed = composeHtml(inputSplitHtml, inputSplitCss, inputSplitJs);
+          setInputCombined(composed);
+        }
+        setMode(newMode);
+      };
+
+      const derivedDecomposed = mode === 'decompose' ? decomposeHtml(inputCombined) : { html: '', css: '', js: '' };
+      const derivedComposed = mode === 'compose' ? composeHtml(inputSplitHtml, inputSplitCss, inputSplitJs) : '';
+
+      const handleDownloadAll = () => {
+        if (derivedDecomposed.html) downloadFile('index.html', derivedDecomposed.html);
+        if (derivedDecomposed.css) {
+          setTimeout(() => downloadFile('style.css', derivedDecomposed.css), 200);
+        }
+        if (derivedDecomposed.js) {
+          setTimeout(() => downloadFile('script.js', derivedDecomposed.js), 400);
+        }
+      };
+
+      return (
+        <div className="min-h-screen bg-gray-50 text-gray-900 p-4 md:p-8 font-sans transition-colors duration-200">
+          <div className="max-w-7xl mx-auto space-y-6">
+            
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
+                <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-gray-900 flex items-center gap-3">
+                  <Icon name="fa-solid fa-code" className="text-blue-500" size={28} />
+                  HTML ToolKit
+                </h1>
+                <p className="text-sm text-gray-500 mt-1">
+                  インラインHTMLの分解と、HTML/CSS/JSの結合を行うユーティリティ
+                </p>
+              </div>
+
+              <div className="flex bg-gray-200/50 p-1 rounded-lg border border-gray-200">
+                <button
+                  onClick={() => handleModeToggle('decompose')}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${
+                    mode === 'decompose'
+                      ? 'bg-white text-blue-600 shadow-sm'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  <Icon name="fa-solid fa-arrows-split-up-and-left" />
+                  分解モード
+                </button>
+                <button
+                  onClick={() => handleModeToggle('compose')}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${
+                    mode === 'compose'
+                      ? 'bg-white text-blue-600 shadow-sm'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  <Icon name="fa-solid fa-object-group" />
+                  結合モード
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-[calc(100vh-180px)] min-h-[600px]">
               
-              {/* Right: Output (Split) */}
-              <div className="flex flex-col gap-4 h-full">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-bold text-gray-700 dark:text-gray-300">抽出されたファイル</span>
-                  <button
-                    onClick={handleDownloadAll}
-                    disabled={!derivedDecomposed.html && !derivedDecomposed.css && !derivedDecomposed.js}
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
-                    title="3つのファイルを一括でダウンロード"
-                  >
-                    <DownloadCloud size={16} />
-                    一括ダウンロード
-                  </button>
-                </div>
-                <EditorPanel
-                  title="index.html"
-                  filename="index.html"
-                  icon={FileCode2}
-                  value={derivedDecomposed.html}
-                  readOnly={true}
-                  className="flex-1"
-                />
-                <EditorPanel
-                  title="style.css"
-                  filename="style.css"
-                  icon={FileType2}
-                  value={derivedDecomposed.css}
-                  readOnly={true}
-                  className="flex-1"
-                />
-                <EditorPanel
-                  title="script.js"
-                  filename="script.js"
-                  icon={FileJson}
-                  value={derivedDecomposed.js}
-                  readOnly={true}
-                  className="flex-1"
-                />
-              </div>
-            </>
-          )}
+              {mode === 'decompose' && (
+                <>
+                  <EditorPanel
+                    title="インライン HTML (入力)"
+                    filename="index.html"
+                    iconName="fa-solid fa-file-code"
+                    value={inputCombined}
+                    onChange={setInputCombined}
+                    placeholder="ここに <style> や <script> を含むHTMLを貼り付けてください..."
+                    className="h-full"
+                  />
+                  
+                  <div className="flex flex-col gap-4 h-full">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-bold text-gray-700">抽出されたファイル</span>
+                      <button
+                        onClick={handleDownloadAll}
+                        disabled={!derivedDecomposed.html && !derivedDecomposed.css && !derivedDecomposed.js}
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+                        title="3つのファイルを一括でダウンロード"
+                      >
+                        <Icon name="fa-solid fa-cloud-arrow-down" />
+                        一括ダウンロード
+                      </button>
+                    </div>
+                    <EditorPanel
+                      title="index.html"
+                      filename="index.html"
+                      iconName="fa-brands fa-html5"
+                      value={derivedDecomposed.html}
+                      readOnly={true}
+                      className="flex-1"
+                    />
+                    <EditorPanel
+                      title="style.css"
+                      filename="style.css"
+                      iconName="fa-brands fa-css3-alt"
+                      value={derivedDecomposed.css}
+                      readOnly={true}
+                      className="flex-1"
+                    />
+                    <EditorPanel
+                      title="script.js"
+                      filename="script.js"
+                      iconName="fa-brands fa-js"
+                      value={derivedDecomposed.js}
+                      readOnly={true}
+                      className="flex-1"
+                    />
+                  </div>
+                </>
+              )}
 
-          {/* --- Compose Mode View --- */}
-          {mode === 'compose' && (
-            <>
-              {/* Left: Input (Split) */}
-              <div className="flex flex-col gap-4 h-full">
-                <EditorPanel
-                  title="index.html"
-                  filename="index.html"
-                  icon={FileCode2}
-                  value={inputSplitHtml}
-                  onChange={setInputSplitHtml}
-                  placeholder="HTMLコードを入力..."
-                  className="flex-1"
-                />
-                <EditorPanel
-                  title="style.css"
-                  filename="style.css"
-                  icon={FileType2}
-                  value={inputSplitCss}
-                  onChange={setInputSplitCss}
-                  placeholder="CSSコードを入力..."
-                  className="flex-1"
-                />
-                <EditorPanel
-                  title="script.js"
-                  filename="script.js"
-                  icon={FileJson}
-                  value={inputSplitJs}
-                  onChange={setInputSplitJs}
-                  placeholder="JavaScriptコードを入力..."
-                  className="flex-1"
-                />
-              </div>
+              {mode === 'compose' && (
+                <>
+                  <div className="flex flex-col gap-4 h-full">
+                    <EditorPanel
+                      title="index.html"
+                      filename="index.html"
+                      iconName="fa-brands fa-html5"
+                      value={inputSplitHtml}
+                      onChange={setInputSplitHtml}
+                      placeholder="HTMLコードを入力..."
+                      className="flex-1"
+                    />
+                    <EditorPanel
+                      title="style.css"
+                      filename="style.css"
+                      iconName="fa-brands fa-css3-alt"
+                      value={inputSplitCss}
+                      onChange={setInputSplitCss}
+                      placeholder="CSSコードを入力..."
+                      className="flex-1"
+                    />
+                    <EditorPanel
+                      title="script.js"
+                      filename="script.js"
+                      iconName="fa-brands fa-js"
+                      value={inputSplitJs}
+                      onChange={setInputSplitJs}
+                      placeholder="JavaScriptコードを入力..."
+                      className="flex-1"
+                    />
+                  </div>
 
-              {/* Right: Output (Combined) */}
-              <EditorPanel
-                title="結合された HTML (出力)"
-                filename="index.html"
-                icon={FileCode2}
-                value={derivedComposed}
-                readOnly={true}
-                className="h-full"
-              />
-            </>
-          )}
-          
+                  <EditorPanel
+                    title="結合された HTML (出力)"
+                    filename="index.html"
+                    iconName="fa-solid fa-file-code"
+                    value={derivedComposed}
+                    readOnly={true}
+                    className="h-full"
+                  />
+                </>
+              )}
+              
+            </div>
+          </div>
         </div>
-      </div>
-    </div>
-  );
-}
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
