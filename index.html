@@ -121,7 +121,13 @@
         }
       });
       
-      const combinedJs = jsList.map(j => j.content.trim()).filter(Boolean).join('\n\n');
+      const combinedJs = jsList.map(j => {
+        let content = j.content.trim();
+        // 複数行にまたがる import ... from '...' や import '...' を削除
+        content = content.replace(/import\s+(?:[\w\s{},*]+)\s+from\s+['"][^'"]+['"]\s*;?/g, '');
+        content = content.replace(/import\s+['"][^'"]+['"]\s*;?/g, '');
+        return content.trim();
+      }).filter(Boolean).join('\n\n');
 
       if (css && css.trim()) {
         const styleTag = `<style>\n${css.trim()}\n<\/style>`;
