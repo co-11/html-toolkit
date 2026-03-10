@@ -22,9 +22,12 @@
   <div id="root"></div>
 
   <script type="text/babel">
-    const { useState, useEffect } = React;
+    const { useState, useEffect, useRef } = React;
 
     // --- Utility Functions ---
+
+    // 正規表現のエスケープ
+    const escapeRegExp = (string) => string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
     // クリップボードへのコピー
     const copyToClipboard = (text) => {
@@ -58,7 +61,7 @@
     };
 
     // HTMLからCSSとJSを抽出して分解する
-    const decomposeHtml = (source) => {
+    const decomposeHtml = (source, cssFilename = 'style.css', jsFilename = 'script.js') => {
       let css = [];
       let js = [];
       let html = source || '';
@@ -77,7 +80,7 @@
       const finalJs = js.join('\n\n').trim();
 
       if (finalCss) {
-        const linkTag = `<link rel="stylesheet" href="style.css">`;
+        const linkTag = `<link rel="stylesheet" href="${cssFilename}">`;
         if (html.match(/<\/head>/i)) {
           html = html.replace(/<\/head>/i, `  ${linkTag}\n</head>`);
         } else {
@@ -86,7 +89,7 @@
       }
 
       if (finalJs) {
-        const scriptTag = `<script src="script.js"><\/script>`;
+        const scriptTag = `<script src="${jsFilename}"><\/script>`;
         if (html.match(/<\/body>/i)) {
           html = html.replace(/<\/body>/i, `  ${scriptTag}\n</body>`);
         } else {
@@ -102,12 +105,24 @@
     };
 
     // HTML, CSS, JSを1つのHTMLに結合する
-    const composeHtml = (html, css, js) => {
+    const composeHtml = (html, css, jsList, cssFilename) => {
       let result = html || '';
       
-      result = result.replace(/<link[^>]*href=["']style\.css["'][^>]*>\n?/gi, '');
-      result = result.replace(/<script[^>]*src=["']script\.js["'][^>]*><\/script>\n?/gi, '');
+      // 動的なファイル名に基づいて外部読み込みタグを削除する
+      if (cssFilename) {
+        const cssRegex = new RegExp(`<link[^>]*href=["']${escapeRegExp(cssFilename)}["'][^>]*>\\n?`, 'gi');
+        result = result.replace(cssRegex, '');
+      }
       
+      jsList.forEach(js => {
+        if (js.filename) {
+          const jsRegex = new RegExp(`<script[^>]*src=["']${escapeRegExp(js.filename)}["'][^>]*><\\/script>\\n?`, 'gi');
+          result = result.replace(jsRegex, '');
+        }
+      });
+      
+      const combinedJs = jsList.map(j => j.content.trim()).filter(Boolean).join('\n\n');
+
       if (css && css.trim()) {
         const styleTag = `<style>\n${css.trim()}\n<\/style>`;
         if (result.match(/<\/head>/i)) {
@@ -117,8 +132,8 @@
         }
       }
 
-      if (js && js.trim()) {
-        const scriptTag = `<script>\n${js.trim()}\n<\/script>`;
+      if (combinedJs && combinedJs.trim()) {
+        const scriptTag = `<script>\n${combinedJs.trim()}\n<\/script>`;
         if (result.match(/<\/body>/i)) {
           result = result.replace(/<\/body>/i, `${scriptTag}\n</body>`);
         } else {
@@ -131,14 +146,13 @@
 
     // --- Components ---
 
-    // アイコンコンポーネント
     const Icon = ({ name, size = 16, className = "" }) => (
       <i className={`${name} ${className}`} style={{ fontSize: size }}></i>
     );
 
-    // エディタパネルコンポーネント
-    const EditorPanel = ({ title, iconName, value, onChange, readOnly, placeholder, className = "", filename }) => {
+    const EditorPanel = ({ label, iconName, value, onChange, readOnly, placeholder, className = "", filename, onFilenameChange, onImport, accept, showRemove, onRemove }) => {
       const [copied, setCopied] = useState(false);
+      const fileInputRef = useRef(null);
 
       const handleCopy = () => {
         if (!value) return;
@@ -152,14 +166,46 @@
         downloadFile(filename, value);
       };
 
+      const handleFileChange = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          if (onImport) onImport(event.target.result, file.name);
+        };
+        reader.readAsText(file);
+        e.target.value = null;
+      };
+
       return (
         <div className={`flex flex-col bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden ${className}`}>
           <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 bg-gray-50/50">
             <div className="flex items-center gap-2 text-gray-700 font-medium">
               <Icon name={iconName} size={16} className="text-blue-500" />
-              {title}
+              {label && <span className="text-sm text-gray-500">{label}</span>}
+              {filename !== undefined && (
+                <input
+                  type="text"
+                  value={filename}
+                  onChange={(e) => onFilenameChange && onFilenameChange(e.target.value)}
+                  className="bg-transparent border-b border-transparent hover:border-gray-300 focus:border-blue-500 focus:outline-none text-sm px-1 py-0.5 w-32 font-bold text-gray-800"
+                  title="ファイル名を編集"
+                />
+              )}
             </div>
             <div className="flex items-center gap-1">
+              {onImport && (
+                <>
+                  <input type="file" accept={accept} onChange={handleFileChange} ref={fileInputRef} className="hidden" />
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
+                    title="ファイルから読み込む"
+                  >
+                    <Icon name="fa-solid fa-folder-open" />
+                  </button>
+                </>
+              )}
               {filename && (
                 <button
                   onClick={handleDownload}
@@ -168,6 +214,15 @@
                   title={`${filename} としてダウンロード`}
                 >
                   <Icon name="fa-solid fa-download" />
+                </button>
+              )}
+              {showRemove && (
+                <button
+                  onClick={onRemove}
+                  className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
+                  title="このパネルを削除"
+                >
+                  <Icon name="fa-solid fa-trash" />
                 </button>
               )}
               <button
@@ -196,43 +251,119 @@
 
     function App() {
       const [mode, setMode] = useState('decompose');
+      
+      // ファイル名の状態管理
+      const [decomposeInputFilename, setDecomposeInputFilename] = useState('index.html');
+      const [decomposeHtmlFilename, setDecomposeHtmlFilename] = useState('index.html');
+      const [decomposeCssFilename, setDecomposeCssFilename] = useState('style.css');
+      const [decomposeJsFilename, setDecomposeJsFilename] = useState('script.js');
+
+      const [composeOutputFilename, setComposeOutputFilename] = useState('index.html');
+      const [composeHtmlFilename, setComposeHtmlFilename] = useState('index.html');
+      const [composeCssFilename, setComposeCssFilename] = useState('style.css');
+
       const [inputCombined, setInputCombined] = useState('');
       const [inputSplitHtml, setInputSplitHtml] = useState('');
       const [inputSplitCss, setInputSplitCss] = useState('');
-      const [inputSplitJs, setInputSplitJs] = useState('');
+      const [inputSplitJsList, setInputSplitJsList] = useState([{ id: Date.now(), content: '', filename: 'script.js' }]);
+
+      const bulkInputRef = useRef(null);
 
       useEffect(() => {
-        const decomposed = decomposeHtml(inputCombined);
+        const decomposed = decomposeHtml(inputCombined, decomposeCssFilename, decomposeJsFilename);
         setInputSplitHtml(decomposed.html);
         setInputSplitCss(decomposed.css);
-        setInputSplitJs(decomposed.js);
+        setInputSplitJsList([{ id: Date.now(), content: decomposed.js, filename: decomposeJsFilename }]);
       }, []);
+
+      const updateJs = (id, content) => {
+        setInputSplitJsList(prev => prev.map(item => item.id === id ? { ...item, content } : item));
+      };
+
+      const updateJsFilename = (id, filename) => {
+        setInputSplitJsList(prev => prev.map(item => item.id === id ? { ...item, filename } : item));
+      };
+
+      const addJsPanel = () => {
+        setInputSplitJsList(prev => [...prev, { id: Date.now(), content: '', filename: `script${prev.length + 1}.js` }]);
+      };
+
+      const removeJsPanel = (id) => {
+        setInputSplitJsList(prev => prev.filter(item => item.id !== id));
+      };
 
       const handleModeToggle = (newMode) => {
         if (newMode === mode) return;
 
         if (newMode === 'compose') {
-          const decomposed = decomposeHtml(inputCombined);
+          const decomposed = decomposeHtml(inputCombined, decomposeCssFilename, decomposeJsFilename);
           setInputSplitHtml(decomposed.html);
           setInputSplitCss(decomposed.css);
-          setInputSplitJs(decomposed.js);
+          setInputSplitJsList([{ id: Date.now(), content: decomposed.js, filename: decomposeJsFilename }]);
         } else {
-          const composed = composeHtml(inputSplitHtml, inputSplitCss, inputSplitJs);
+          const composed = composeHtml(inputSplitHtml, inputSplitCss, inputSplitJsList, composeCssFilename);
           setInputCombined(composed);
         }
         setMode(newMode);
       };
 
-      const derivedDecomposed = mode === 'decompose' ? decomposeHtml(inputCombined) : { html: '', css: '', js: '' };
-      const derivedComposed = mode === 'compose' ? composeHtml(inputSplitHtml, inputSplitCss, inputSplitJs) : '';
+      // 結合モード：一括インポート処理
+      const handleBulkImport = async (e) => {
+        const files = Array.from(e.target.files);
+        if (files.length === 0) return;
+
+        const readAsText = (file) => new Promise((resolve) => {
+          const reader = new FileReader();
+          reader.onload = (event) => resolve({ name: file.name, text: event.target.result });
+          reader.readAsText(file);
+        });
+
+        const fileDataArray = await Promise.all(files.map(readAsText));
+        let jsFiles = [];
+
+        fileDataArray.forEach(({ name, text }) => {
+          const ext = name.split('.').pop().toLowerCase();
+          if (ext === 'html') {
+            setInputSplitHtml(text);
+            setComposeHtmlFilename(name);
+          } else if (ext === 'css') {
+            setInputSplitCss(text);
+            setComposeCssFilename(name);
+          } else if (ext === 'js') {
+            jsFiles.push({ name, text });
+          }
+        });
+
+        if (jsFiles.length > 0) {
+          setInputSplitJsList(prev => {
+            if (prev.length === 1 && prev[0].content === '') {
+              return jsFiles.map((f, i) => ({ id: Date.now() + i, content: f.text, filename: f.name }));
+            } else {
+              return [
+                ...prev,
+                ...jsFiles.map((f, i) => ({ id: Date.now() + i, content: f.text, filename: f.name }))
+              ];
+            }
+          });
+        }
+        e.target.value = null; // リセット
+      };
+
+      const derivedDecomposed = mode === 'decompose' 
+        ? decomposeHtml(inputCombined, decomposeCssFilename, decomposeJsFilename) 
+        : { html: '', css: '', js: '' };
+      
+      const derivedComposed = mode === 'compose' 
+        ? composeHtml(inputSplitHtml, inputSplitCss, inputSplitJsList, composeCssFilename) 
+        : '';
 
       const handleDownloadAll = () => {
-        if (derivedDecomposed.html) downloadFile('index.html', derivedDecomposed.html);
+        if (derivedDecomposed.html) downloadFile(decomposeHtmlFilename, derivedDecomposed.html);
         if (derivedDecomposed.css) {
-          setTimeout(() => downloadFile('style.css', derivedDecomposed.css), 200);
+          setTimeout(() => downloadFile(decomposeCssFilename, derivedDecomposed.css), 200);
         }
         if (derivedDecomposed.js) {
-          setTimeout(() => downloadFile('script.js', derivedDecomposed.js), 400);
+          setTimeout(() => downloadFile(decomposeJsFilename, derivedDecomposed.js), 400);
         }
       };
 
@@ -255,9 +386,7 @@
                 <button
                   onClick={() => handleModeToggle('decompose')}
                   className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${
-                    mode === 'decompose'
-                      ? 'bg-white text-blue-600 shadow-sm'
-                      : 'text-gray-600 hover:text-gray-900'
+                    mode === 'decompose' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-600 hover:text-gray-900'
                   }`}
                 >
                   <Icon name="fa-solid fa-arrows-split-up-and-left" />
@@ -266,9 +395,7 @@
                 <button
                   onClick={() => handleModeToggle('compose')}
                   className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${
-                    mode === 'compose'
-                      ? 'bg-white text-blue-600 shadow-sm'
-                      : 'text-gray-600 hover:text-gray-900'
+                    mode === 'compose' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-600 hover:text-gray-900'
                   }`}
                 >
                   <Icon name="fa-solid fa-object-group" />
@@ -279,14 +406,21 @@
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-[calc(100vh-180px)] min-h-[600px]">
               
+              {/* --- 分解モード --- */}
               {mode === 'decompose' && (
                 <>
                   <EditorPanel
-                    title="インライン HTML (入力)"
-                    filename="index.html"
+                    label="入力HTML"
+                    filename={decomposeInputFilename}
+                    onFilenameChange={setDecomposeInputFilename}
                     iconName="fa-solid fa-file-code"
                     value={inputCombined}
                     onChange={setInputCombined}
+                    onImport={(content, name) => {
+                      setInputCombined(content);
+                      if (name) setDecomposeInputFilename(name);
+                    }}
+                    accept=".html,.txt"
                     placeholder="ここに <style> や <script> を含むHTMLを貼り付けてください..."
                     className="h-full"
                   />
@@ -305,68 +439,112 @@
                       </button>
                     </div>
                     <EditorPanel
-                      title="index.html"
-                      filename="index.html"
+                      filename={decomposeHtmlFilename}
+                      onFilenameChange={setDecomposeHtmlFilename}
                       iconName="fa-brands fa-html5"
                       value={derivedDecomposed.html}
                       readOnly={true}
-                      className="flex-1"
+                      className="flex-1 min-h-0"
                     />
                     <EditorPanel
-                      title="style.css"
-                      filename="style.css"
+                      filename={decomposeCssFilename}
+                      onFilenameChange={setDecomposeCssFilename}
                       iconName="fa-brands fa-css3-alt"
                       value={derivedDecomposed.css}
                       readOnly={true}
-                      className="flex-1"
+                      className="flex-1 min-h-0"
                     />
                     <EditorPanel
-                      title="script.js"
-                      filename="script.js"
+                      filename={decomposeJsFilename}
+                      onFilenameChange={setDecomposeJsFilename}
                       iconName="fa-brands fa-js"
                       value={derivedDecomposed.js}
                       readOnly={true}
-                      className="flex-1"
+                      className="flex-1 min-h-0"
                     />
                   </div>
                 </>
               )}
 
+              {/* --- 結合モード --- */}
               {mode === 'compose' && (
                 <>
-                  <div className="flex flex-col gap-4 h-full">
+                  <div className="flex flex-col gap-4 h-full overflow-y-auto pr-2 pb-2">
+                    <div className="flex items-center justify-between pb-1">
+                      <span className="text-sm font-bold text-gray-700">結合するファイル群</span>
+                      <button
+                        onClick={() => bulkInputRef.current?.click()}
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-md transition-colors shadow-sm"
+                        title="複数ファイルをまとめて読み込みます"
+                      >
+                        <Icon name="fa-solid fa-file-import" />
+                        一括インポート
+                      </button>
+                      <input type="file" multiple accept=".html,.css,.js,.txt" onChange={handleBulkImport} className="hidden" ref={bulkInputRef} />
+                    </div>
+
                     <EditorPanel
-                      title="index.html"
-                      filename="index.html"
+                      filename={composeHtmlFilename}
+                      onFilenameChange={setComposeHtmlFilename}
                       iconName="fa-brands fa-html5"
                       value={inputSplitHtml}
                       onChange={setInputSplitHtml}
+                      onImport={(content, name) => {
+                        setInputSplitHtml(content);
+                        if (name) setComposeHtmlFilename(name);
+                      }}
+                      accept=".html,.txt"
                       placeholder="HTMLコードを入力..."
-                      className="flex-1"
+                      className="min-h-[250px] flex-shrink-0"
                     />
                     <EditorPanel
-                      title="style.css"
-                      filename="style.css"
+                      filename={composeCssFilename}
+                      onFilenameChange={setComposeCssFilename}
                       iconName="fa-brands fa-css3-alt"
                       value={inputSplitCss}
                       onChange={setInputSplitCss}
+                      onImport={(content, name) => {
+                        setInputSplitCss(content);
+                        if (name) setComposeCssFilename(name);
+                      }}
+                      accept=".css,.txt"
                       placeholder="CSSコードを入力..."
-                      className="flex-1"
+                      className="min-h-[250px] flex-shrink-0"
                     />
-                    <EditorPanel
-                      title="script.js"
-                      filename="script.js"
-                      iconName="fa-brands fa-js"
-                      value={inputSplitJs}
-                      onChange={setInputSplitJs}
-                      placeholder="JavaScriptコードを入力..."
-                      className="flex-1"
-                    />
+                    
+                    {inputSplitJsList.map((jsItem) => (
+                      <EditorPanel
+                        key={jsItem.id}
+                        filename={jsItem.filename}
+                        onFilenameChange={(val) => updateJsFilename(jsItem.id, val)}
+                        iconName="fa-brands fa-js"
+                        value={jsItem.content}
+                        onChange={(val) => updateJs(jsItem.id, val)}
+                        onImport={(content, name) => {
+                          updateJs(jsItem.id, content);
+                          if (name) updateJsFilename(jsItem.id, name);
+                        }}
+                        accept=".js,.txt"
+                        showRemove={inputSplitJsList.length > 1}
+                        onRemove={() => removeJsPanel(jsItem.id)}
+                        placeholder="JavaScriptコードを入力..."
+                        className="min-h-[250px] flex-shrink-0"
+                      />
+                    ))}
+                    
+                    <button
+                      onClick={addJsPanel}
+                      className="flex items-center justify-center gap-2 w-full py-3 border-2 border-dashed border-gray-300 text-gray-500 rounded-xl hover:bg-gray-50 hover:border-gray-400 hover:text-gray-700 transition-colors font-medium flex-shrink-0"
+                    >
+                      <Icon name="fa-solid fa-plus" />
+                      JavaScriptファイルを追加
+                    </button>
                   </div>
 
                   <EditorPanel
-                    title="結合された HTML (出力)"
-                    filename="index.html"
+                    label="出力HTML"
+                    filename={composeOutputFilename}
+                    onFilenameChange={setComposeOutputFilename}
                     iconName="fa-solid fa-file-code"
                     value={derivedComposed}
                     readOnly={true}
