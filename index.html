@@ -29,6 +29,15 @@
     // 正規表現のエスケープ
     const escapeRegExp = (string) => string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
+    // コメント削除用のユーティリティ関数
+    const stripHtmlComments = (str) => str.replace(/<!--[\s\S]*?-->/g, '');
+    const stripCssComments = (str) => str.replace(/\/\*[\s\S]*?\*\//g, '');
+    const stripJsComments = (str) => {
+      return str
+        .replace(/\/\*[\s\S]*?\*\//g, '') // 複数行コメント /* ... */
+        .replace(/(?<!:)\/\/.*$/gm, '');  // 単一行コメント // ... (http://等のURLは除外)
+    };
+
     // クリップボードへのコピー
     const copyToClipboard = (text) => {
       const textArea = document.createElement("textarea");
@@ -61,11 +70,15 @@
     };
 
     // HTMLからCSSとJSを抽出して分解する
-    const decomposeHtml = (source, cssFilename = 'style.css', jsFilename = 'script.js') => {
+    const decomposeHtml = (source, cssFilename = 'style.css', jsFilename = 'script.js', removeComments = false) => {
       let css = [];
       let js = [];
       let html = source || '';
       
+      if (removeComments) {
+        html = stripHtmlComments(html);
+      }
+
       html = html.replace(/<style[^>]*>([\s\S]*?)<\/style>/gi, (match, p1) => {
         if (p1.trim()) css.push(p1.trim());
         return '';
@@ -76,8 +89,13 @@
         return '';
       });
 
-      const finalCss = css.join('\n\n').trim();
-      const finalJs = js.join('\n\n').trim();
+      let finalCss = css.join('\n\n').trim();
+      let finalJs = js.join('\n\n').trim();
+
+      if (removeComments) {
+        finalCss = stripCssComments(finalCss);
+        finalJs = stripJsComments(finalJs);
+      }
 
       if (finalCss) {
         const linkTag = `<link rel="stylesheet" href="${cssFilename}">`;
@@ -104,10 +122,36 @@
       };
     };
 
+    // 新規: 複数JSの結合・無害化処理（独立した関数）
+    const composeJs = (jsList, removeComments = false) => {
+      return jsList.map(j => {
+        let content = j.content.trim();
+        
+        if (removeComments) {
+          content = stripJsComments(content);
+        }
+
+        // --- モジュール構文 (import/export) の削除・無害化 ---
+        content = content.replace(/import\s+[\s\S]*?from\s+['"][^'"]+['"]\s*;?/g, '');
+        content = content.replace(/import\s+['"][^'"]+['"]\s*;?/g, '');
+        content = content.replace(/export\s+\{[\s\S]*?\}\s*(?:from\s+['"][^'"]+['"]\s*)?;?/g, '');
+        content = content.replace(/export\s+\*\s+from\s+['"][^'"]+['"]\s*;?/g, '');
+        content = content.replace(/export\s+default\s+/g, '');
+        content = content.replace(/export\s+(async\s+function)\b/g, '$1');
+        content = content.replace(/export\s+(const|let|var|function|class)\b/g, '$1');
+
+        return content.trim();
+      }).filter(Boolean).join('\n\n');
+    };
+
     // HTML, CSS, JSを1つのHTMLに結合する
-    const composeHtml = (html, css, jsList, cssFilename) => {
+    const composeHtml = (html, css, jsList, cssFilename, removeComments = false) => {
       let result = html || '';
       
+      if (removeComments) {
+        result = stripHtmlComments(result);
+      }
+
       // 動的なファイル名に基づいて外部読み込みタグを削除する
       if (cssFilename) {
         // ./style.css などのパス付きにも対応
@@ -123,32 +167,15 @@
         }
       });
       
-      const combinedJs = jsList.map(j => {
-        let content = j.content.trim();
-        
-        // --- モジュール構文 (import/export) の削除・無害化をさらに強化 ---
-        
-        // 1. import文の削除
-        content = content.replace(/import\s+[\s\S]*?from\s+['"][^'"]+['"]\s*;?/g, '');
-        content = content.replace(/import\s+['"][^'"]+['"]\s*;?/g, '');
-        
-        // 2. export文の無害化・削除
-        // export { ... } [from '...']; を丸ごと削除
-        content = content.replace(/export\s+\{[\s\S]*?\}\s*(?:from\s+['"][^'"]+['"]\s*)?;?/g, '');
-        // export * from '...'; を丸ごと削除
-        content = content.replace(/export\s+\*\s+from\s+['"][^'"]+['"]\s*;?/g, '');
-        // export default を削除
-        content = content.replace(/export\s+default\s+/g, '');
-        // export async function などの修飾子付きに対応
-        content = content.replace(/export\s+(async\s+function)\b/g, '$1');
-        // 基本的な export 宣言の修飾子 (const, let, var, function, class) を削除して中身を残す
-        content = content.replace(/export\s+(const|let|var|function|class)\b/g, '$1');
+      const combinedJs = composeJs(jsList, removeComments);
 
-        return content.trim();
-      }).filter(Boolean).join('\n\n');
+      let finalCss = css ? css.trim() : '';
+      if (removeComments && finalCss) {
+        finalCss = stripCssComments(finalCss);
+      }
 
-      if (css && css.trim()) {
-        const styleTag = `<style>\n${css.trim()}\n<\/style>`;
+      if (finalCss) {
+        const styleTag = `<style>\n${finalCss}\n<\/style>`;
         if (result.match(/<\/head>/i)) {
           result = result.replace(/<\/head>/i, `${styleTag}\n</head>`);
         } else {
@@ -177,6 +204,10 @@
     const EditorPanel = ({ label, iconName, value, onChange, readOnly, placeholder, className = "", filename, onFilenameChange, onImport, accept, showRemove, onRemove, showMoveUp, onMoveUp, showMoveDown, onMoveDown }) => {
       const [copied, setCopied] = useState(false);
       const fileInputRef = useRef(null);
+
+      const textValue = value || '';
+      const charCount = textValue.length;
+      const lineCount = textValue === '' ? 0 : textValue.split('\n').length;
 
       const handleCopy = () => {
         if (!value) return;
@@ -285,6 +316,10 @@
             spellCheck={false}
             className={`flex-1 w-full p-4 font-mono text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500/50 bg-transparent text-gray-800 ${readOnly ? 'bg-gray-50/30' : ''}`}
           />
+          <div className="bg-gray-50/80 border-t border-gray-100 px-3 py-1.5 flex justify-end gap-4 text-xs text-gray-400 font-mono select-none">
+            <span>{lineCount} 行</span>
+            <span>{charCount} 文字</span>
+          </div>
         </div>
       );
     };
@@ -293,6 +328,7 @@
 
     function App() {
       const [mode, setMode] = useState('decompose');
+      const [removeComments, setRemoveComments] = useState(false); // コメント削除状態の管理
       
       // ファイル名の状態管理
       const [decomposeInputFilename, setDecomposeInputFilename] = useState('index.html');
@@ -304,6 +340,9 @@
       const [composeHtmlFilename, setComposeHtmlFilename] = useState('index.html');
       const [composeCssFilename, setComposeCssFilename] = useState('style.css');
 
+      // JS結合モード用のファイル名
+      const [composeJsOutputFilename, setComposeJsOutputFilename] = useState('bundle.js');
+
       const [inputCombined, setInputCombined] = useState('');
       const [inputSplitHtml, setInputSplitHtml] = useState('');
       const [inputSplitCss, setInputSplitCss] = useState('');
@@ -312,7 +351,7 @@
       const bulkInputRef = useRef(null);
 
       useEffect(() => {
-        const decomposed = decomposeHtml(inputCombined, decomposeCssFilename, decomposeJsFilename);
+        const decomposed = decomposeHtml(inputCombined, decomposeCssFilename, decomposeJsFilename, removeComments);
         setInputSplitHtml(decomposed.html);
         setInputSplitCss(decomposed.css);
         setInputSplitJsList([{ id: Date.now(), content: decomposed.js, filename: decomposeJsFilename }]);
@@ -349,14 +388,18 @@
       const handleModeToggle = (newMode) => {
         if (newMode === mode) return;
 
-        if (newMode === 'compose') {
-          const decomposed = decomposeHtml(inputCombined, decomposeCssFilename, decomposeJsFilename);
-          setInputSplitHtml(decomposed.html);
-          setInputSplitCss(decomposed.css);
-          setInputSplitJsList([{ id: Date.now(), content: decomposed.js, filename: decomposeJsFilename }]);
-        } else {
-          const composed = composeHtml(inputSplitHtml, inputSplitCss, inputSplitJsList, composeCssFilename);
-          setInputCombined(composed);
+        if (newMode === 'compose' || newMode === 'compose-js') {
+          if (mode === 'decompose') {
+            const decomposed = decomposeHtml(inputCombined, decomposeCssFilename, decomposeJsFilename, removeComments);
+            setInputSplitHtml(decomposed.html);
+            setInputSplitCss(decomposed.css);
+            setInputSplitJsList([{ id: Date.now(), content: decomposed.js, filename: decomposeJsFilename }]);
+          }
+        } else if (newMode === 'decompose') {
+          if (mode === 'compose') {
+            const composed = composeHtml(inputSplitHtml, inputSplitCss, inputSplitJsList, composeCssFilename, removeComments);
+            setInputCombined(composed);
+          }
         }
         setMode(newMode);
       };
@@ -377,14 +420,20 @@
 
         fileDataArray.forEach(({ name, text }) => {
           const ext = name.split('.').pop().toLowerCase();
-          if (ext === 'html') {
-            setInputSplitHtml(text);
-            setComposeHtmlFilename(name);
-          } else if (ext === 'css') {
-            setInputSplitCss(text);
-            setComposeCssFilename(name);
-          } else if (ext === 'js') {
-            jsFiles.push({ name, text });
+          if (mode === 'compose') {
+            if (ext === 'html') {
+              setInputSplitHtml(text);
+              setComposeHtmlFilename(name);
+            } else if (ext === 'css') {
+              setInputSplitCss(text);
+              setComposeCssFilename(name);
+            } else if (ext === 'js') {
+              jsFiles.push({ name, text });
+            }
+          } else if (mode === 'compose-js') {
+            if (ext === 'js' || ext === 'txt') {
+              jsFiles.push({ name, text });
+            }
           }
         });
 
@@ -491,11 +540,15 @@
       };
 
       const derivedDecomposed = mode === 'decompose' 
-        ? decomposeHtml(inputCombined, decomposeCssFilename, decomposeJsFilename) 
+        ? decomposeHtml(inputCombined, decomposeCssFilename, decomposeJsFilename, removeComments) 
         : { html: '', css: '', js: '' };
       
       const derivedComposed = mode === 'compose' 
-        ? composeHtml(inputSplitHtml, inputSplitCss, inputSplitJsList, composeCssFilename) 
+        ? composeHtml(inputSplitHtml, inputSplitCss, inputSplitJsList, composeCssFilename, removeComments) 
+        : '';
+
+      const derivedComposedJs = mode === 'compose-js'
+        ? composeJs(inputSplitJsList, removeComments)
         : '';
 
       const handleDownloadAll = () => {
@@ -523,25 +576,48 @@
                 </p>
               </div>
 
-              <div className="flex bg-gray-200/50 p-1 rounded-lg border border-gray-200">
-                <button
-                  onClick={() => handleModeToggle('decompose')}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${
-                    mode === 'decompose' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-600 hover:text-gray-900'
-                  }`}
-                >
-                  <Icon name="fa-solid fa-arrows-split-up-and-left" />
-                  分解モード
-                </button>
-                <button
-                  onClick={() => handleModeToggle('compose')}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${
-                    mode === 'compose' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-600 hover:text-gray-900'
-                  }`}
-                >
-                  <Icon name="fa-solid fa-object-group" />
-                  結合モード
-                </button>
+              <div className="flex flex-wrap items-center gap-4">
+                {/* コメント自動削除トグル */}
+                <label className="flex items-center gap-2 text-sm font-medium text-gray-700 cursor-pointer hover:text-gray-900 bg-white px-3 py-2 rounded-lg border border-gray-200 shadow-sm transition-colors">
+                  <input
+                    type="checkbox"
+                    checked={removeComments}
+                    onChange={(e) => setRemoveComments(e.target.checked)}
+                    className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500 cursor-pointer"
+                  />
+                  コメント自動削除
+                </label>
+
+                {/* モード切り替え */}
+                <div className="flex bg-gray-200/50 p-1 rounded-lg border border-gray-200">
+                  <button
+                    onClick={() => handleModeToggle('decompose')}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${
+                      mode === 'decompose' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-600 hover:text-gray-900'
+                    }`}
+                  >
+                    <Icon name="fa-solid fa-arrows-split-up-and-left" />
+                    HTML分解
+                  </button>
+                  <button
+                    onClick={() => handleModeToggle('compose')}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${
+                      mode === 'compose' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-600 hover:text-gray-900'
+                    }`}
+                  >
+                    <Icon name="fa-solid fa-object-group" />
+                    HTML結合
+                  </button>
+                  <button
+                    onClick={() => handleModeToggle('compose-js')}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${
+                      mode === 'compose-js' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-600 hover:text-gray-900'
+                    }`}
+                  >
+                    <Icon name="fa-brands fa-js" />
+                    JSのみ結合
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -703,6 +779,79 @@
                     onFilenameChange={setComposeOutputFilename}
                     iconName="fa-solid fa-file-code"
                     value={derivedComposed}
+                    readOnly={true}
+                    className="h-full"
+                  />
+                </>
+              )}
+
+              {/* --- JS結合モード --- */}
+              {mode === 'compose-js' && (
+                <>
+                  <div className="flex flex-col gap-4 h-full overflow-y-auto pr-2 pb-2">
+                    <div className="flex items-center justify-between pb-1">
+                      <span className="text-sm font-bold text-gray-700">結合するJSファイル群</span>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={handleAutoSortJs}
+                          disabled={inputSplitJsList.length <= 1}
+                          className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-blue-500 hover:bg-blue-600 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+                          title="JSのimport文を解析して依存関係の順に並び替えます"
+                        >
+                          <Icon name="fa-solid fa-wand-magic-sparkles" />
+                          自動並び替え
+                        </button>
+                        <button
+                          onClick={() => bulkInputRef.current?.click()}
+                          className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-md transition-colors shadow-sm"
+                          title="複数ファイルをまとめて読み込みます"
+                        >
+                          <Icon name="fa-solid fa-file-import" />
+                          一括インポート
+                        </button>
+                      </div>
+                      <input type="file" multiple accept=".js,.txt" onChange={handleBulkImport} className="hidden" ref={bulkInputRef} />
+                    </div>
+
+                    {inputSplitJsList.map((jsItem, index) => (
+                      <EditorPanel
+                        key={jsItem.id}
+                        filename={jsItem.filename}
+                        onFilenameChange={(val) => updateJsFilename(jsItem.id, val)}
+                        iconName="fa-brands fa-js"
+                        value={jsItem.content}
+                        onChange={(val) => updateJs(jsItem.id, val)}
+                        onImport={(content, name) => {
+                          updateJs(jsItem.id, content);
+                          if (name) updateJsFilename(jsItem.id, name);
+                        }}
+                        accept=".js,.txt"
+                        showRemove={inputSplitJsList.length > 1}
+                        onRemove={() => removeJsPanel(jsItem.id)}
+                        showMoveUp={index > 0}
+                        onMoveUp={() => moveJsPanel(index, 'up')}
+                        showMoveDown={index < inputSplitJsList.length - 1}
+                        onMoveDown={() => moveJsPanel(index, 'down')}
+                        placeholder="JavaScriptコードを入力..."
+                        className="min-h-[250px] flex-shrink-0"
+                      />
+                    ))}
+                    
+                    <button
+                      onClick={addJsPanel}
+                      className="flex items-center justify-center gap-2 w-full py-3 border-2 border-dashed border-gray-300 text-gray-500 rounded-xl hover:bg-gray-50 hover:border-gray-400 hover:text-gray-700 transition-colors font-medium flex-shrink-0"
+                    >
+                      <Icon name="fa-solid fa-plus" />
+                      JavaScriptファイルを追加
+                    </button>
+                  </div>
+
+                  <EditorPanel
+                    label="出力JS"
+                    filename={composeJsOutputFilename}
+                    onFilenameChange={setComposeJsOutputFilename}
+                    iconName="fa-brands fa-js"
+                    value={derivedComposedJs}
                     readOnly={true}
                     className="h-full"
                   />
