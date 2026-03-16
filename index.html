@@ -365,6 +365,93 @@
         setInputSplitJsList(prev => prev.map(item => item.id === id ? { ...item, filename } : item));
       };
 
+      // JSの自動並び替え処理のコアロジック
+      const sortJsList = (jsList) => {
+        if (jsList.length <= 1) return jsList;
+
+        const nodes = new Map();
+        jsList.forEach(js => {
+          nodes.set(js.filename, { item: js, dependencies: [] });
+        });
+
+        const importRegex = /import\s+[\s\S]*?from\s+['"]([^'"]+)['"]/g;
+        const importRegex2 = /import\s+['"]([^'"]+)['"]/g;
+
+        jsList.forEach(js => {
+          const deps = new Set();
+          let match;
+          const content = js.content;
+          
+          while ((match = importRegex.exec(content)) !== null) {
+            const depFilename = match[1].split('/').pop();
+            if (nodes.has(depFilename)) deps.add(depFilename);
+          }
+          
+          while ((match = importRegex2.exec(content)) !== null) {
+            const depFilename = match[1].split('/').pop();
+            if (nodes.has(depFilename)) deps.add(depFilename);
+          }
+
+          const node = nodes.get(js.filename);
+          deps.forEach(depFilename => {
+            if (depFilename !== js.filename) {
+              node.dependencies.push(depFilename);
+            }
+          });
+        });
+
+        const graph = new Map();
+        const inDegree = new Map();
+        nodes.forEach((_, filename) => {
+          graph.set(filename, []);
+          inDegree.set(filename, 0);
+        });
+
+        nodes.forEach((node, filename) => {
+          node.dependencies.forEach(dep => {
+            if (graph.has(dep)) {
+              graph.get(dep).push(filename);
+              inDegree.set(filename, inDegree.get(filename) + 1);
+            }
+          });
+        });
+
+        const queue = [];
+        inDegree.forEach((degree, filename) => {
+          if (degree === 0) queue.push(filename);
+        });
+
+        const sortedFilenames = [];
+        while (queue.length > 0) {
+          const current = queue.shift();
+          sortedFilenames.push(current);
+          graph.get(current).forEach(neighbor => {
+            inDegree.set(neighbor, inDegree.get(neighbor) - 1);
+            if (inDegree.get(neighbor) === 0) {
+              queue.push(neighbor);
+            }
+          });
+        }
+
+        const sortedSet = new Set(sortedFilenames);
+        jsList.forEach(js => {
+          if (!sortedSet.has(js.filename)) {
+            sortedFilenames.push(js.filename);
+            console.warn(`[Auto Sort] 循環依存の可能性があります: ${js.filename}`);
+          }
+        });
+
+        return sortedFilenames.map(filename => nodes.get(filename).item);
+      };
+
+      // ファイル読み込み時に内容とファイル名を更新し、即座にソートする関数
+      const updateJsAndSort = (id, content, filename) => {
+        setInputSplitJsList(prev => {
+          const newList = prev.map(item => item.id === id ? { ...item, content, filename: filename || item.filename } : item);
+          return sortJsList(newList);
+        });
+      };
+
       const addJsPanel = () => {
         setInputSplitJsList(prev => [...prev, { id: Date.now(), content: '', filename: `script${prev.length + 1}.js` }]);
       };
@@ -439,104 +526,25 @@
 
         if (jsFiles.length > 0) {
           setInputSplitJsList(prev => {
+            let newList;
             if (prev.length === 1 && prev[0].content === '') {
-              return jsFiles.map((f, i) => ({ id: Date.now() + i, content: f.text, filename: f.name }));
+              newList = jsFiles.map((f, i) => ({ id: Date.now() + i, content: f.text, filename: f.name }));
             } else {
-              return [
+              newList = [
                 ...prev,
                 ...jsFiles.map((f, i) => ({ id: Date.now() + i, content: f.text, filename: f.name }))
               ];
             }
+            // 一括インポート後に自動ソートを適用
+            return sortJsList(newList);
           });
         }
         e.target.value = null; // リセット
       };
 
-      // 結合モード：JSの自動並び替え処理 (import文を解析して依存関係順にソート)
+      // 手動の自動並び替えボタン用
       const handleAutoSortJs = () => {
-        if (inputSplitJsList.length <= 1) return;
-
-        const nodes = new Map();
-        // データの初期化 (ファイル名をキーにして情報を保持)
-        inputSplitJsList.forEach(js => {
-          // JSのファイル名が重複していると上書きされるため、ユニークな識別子にする
-          nodes.set(js.filename, { item: js, dependencies: [] });
-        });
-
-        const importRegex = /import\s+[\s\S]*?from\s+['"]([^'"]+)['"]/g;
-        const importRegex2 = /import\s+['"]([^'"]+)['"]/g;
-
-        // 依存関係の抽出
-        inputSplitJsList.forEach(js => {
-          const deps = new Set();
-          let match;
-          const content = js.content;
-          
-          while ((match = importRegex.exec(content)) !== null) {
-            const depFilename = match[1].split('/').pop(); // './core.js' -> 'core.js'
-            if (nodes.has(depFilename)) deps.add(depFilename);
-          }
-          
-          while ((match = importRegex2.exec(content)) !== null) {
-            const depFilename = match[1].split('/').pop();
-            if (nodes.has(depFilename)) deps.add(depFilename);
-          }
-
-          const node = nodes.get(js.filename);
-          deps.forEach(depFilename => {
-            if (depFilename !== js.filename) { // 自己依存を防ぐ
-              node.dependencies.push(depFilename);
-            }
-          });
-        });
-
-        // トポロジカルソート用グラフの構築
-        const graph = new Map();
-        const inDegree = new Map();
-        nodes.forEach((_, filename) => {
-          graph.set(filename, []);
-          inDegree.set(filename, 0);
-        });
-
-        // 依存先(A)が依存元(B)より先に来る必要がある -> エッジは A から B へ引く
-        nodes.forEach((node, filename) => {
-          node.dependencies.forEach(dep => {
-            if (graph.has(dep)) {
-              graph.get(dep).push(filename);
-              inDegree.set(filename, inDegree.get(filename) + 1);
-            }
-          });
-        });
-
-        const queue = [];
-        inDegree.forEach((degree, filename) => {
-          if (degree === 0) queue.push(filename);
-        });
-
-        const sortedFilenames = [];
-        while (queue.length > 0) {
-          const current = queue.shift();
-          sortedFilenames.push(current);
-          graph.get(current).forEach(neighbor => {
-            inDegree.set(neighbor, inDegree.get(neighbor) - 1);
-            if (inDegree.get(neighbor) === 0) {
-              queue.push(neighbor);
-            }
-          });
-        }
-
-        // 循環参照等によりソートできなかったファイルがある場合は末尾に追加
-        const sortedSet = new Set(sortedFilenames);
-        inputSplitJsList.forEach(js => {
-          if (!sortedSet.has(js.filename)) {
-            sortedFilenames.push(js.filename);
-            console.warn(`[Auto Sort] 循環依存の可能性があります: ${js.filename}`);
-          }
-        });
-
-        // ソート結果を反映
-        const sortedList = sortedFilenames.map(filename => nodes.get(filename).item);
-        setInputSplitJsList(sortedList);
+        setInputSplitJsList(prev => sortJsList(prev));
       };
 
       const derivedDecomposed = mode === 'decompose' 
@@ -749,8 +757,7 @@
                         value={jsItem.content}
                         onChange={(val) => updateJs(jsItem.id, val)}
                         onImport={(content, name) => {
-                          updateJs(jsItem.id, content);
-                          if (name) updateJsFilename(jsItem.id, name);
+                          updateJsAndSort(jsItem.id, content, name);
                         }}
                         accept=".js,.txt"
                         showRemove={inputSplitJsList.length > 1}
@@ -822,8 +829,7 @@
                         value={jsItem.content}
                         onChange={(val) => updateJs(jsItem.id, val)}
                         onImport={(content, name) => {
-                          updateJs(jsItem.id, content);
-                          if (name) updateJsFilename(jsItem.id, name);
+                          updateJsAndSort(jsItem.id, content, name);
                         }}
                         accept=".js,.txt"
                         showRemove={inputSplitJsList.length > 1}
