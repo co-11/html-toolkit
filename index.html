@@ -1,877 +1,501 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>HTML ToolKit</title>
-  
-  <!-- Tailwind CSS -->
-  <script src="https://cdn.tailwindcss.com"></script>
-  
-  <!-- FontAwesome (アイコン用) -->
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  
-  <!-- React & ReactDOM -->
-  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-  
-  <!-- Babel (ブラウザ内でJSXをコンパイルするため) -->
-  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HTML ToolKit</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧰</text></svg>">
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg:#f9fafb; --panel:#fff; --border:#e5e7eb; --border-soft:#f3f4f6;
+  --head:#fafafa; --text:#111827; --muted:#6b7280; --faint:#9ca3af;
+  --accent:#2563eb; --accent-h:#1d4ed8; --accent-soft:#3b82f6;
+  --green:#16a34a; --green-h:#15803d; --red:#ef4444; --red-soft:#fee2e2;
+  --hover:#f3f4f6; --shadow:0 1px 2px rgba(0,0,0,.05); --radius:12px;
+}
+[data-theme="dark"] {
+  --bg:#0f172a; --panel:#1e293b; --border:#334155; --border-soft:#243045;
+  --head:#19243b; --text:#f1f5f9; --muted:#94a3b8; --faint:#64748b;
+  --accent:#3b82f6; --accent-h:#60a5fa; --accent-soft:#3b82f6;
+  --green:#22c55e; --green-h:#16a34a; --red:#f87171; --red-soft:#3f1d1d;
+  --hover:#334155; --shadow:0 1px 2px rgba(0,0,0,.3);
+}
+body { font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans JP",sans-serif; background:var(--bg); color:var(--text); min-height:100vh; transition:background .2s,color .2s; }
+.wrap { max-width:1280px; margin:0 auto; padding:24px 16px; }
+@media(min-width:768px){ .wrap{ padding:32px; } }
+.header { display:flex; flex-direction:column; gap:16px; justify-content:space-between; margin-bottom:24px; }
+@media(min-width:768px){ .header{ flex-direction:row; align-items:center; } }
+.title { font-size:24px; font-weight:700; display:flex; align-items:center; gap:12px; letter-spacing:-.02em; }
+.title .logo { font-size:28px; }
+.subtitle { font-size:13px; color:var(--muted); margin-top:4px; }
+.controls { display:flex; flex-wrap:wrap; align-items:center; gap:12px; }
+.toggle { display:flex; align-items:center; gap:8px; font-size:13px; font-weight:500; color:var(--text); cursor:pointer; background:var(--panel); padding:8px 12px; border-radius:8px; border:1px solid var(--border); box-shadow:var(--shadow); }
+.toggle input { width:16px; height:16px; cursor:pointer; accent-color:var(--accent); }
+.icon-toggle { background:var(--panel); border:1px solid var(--border); border-radius:8px; padding:8px 11px; cursor:pointer; box-shadow:var(--shadow); font-size:15px; line-height:1; }
+.icon-toggle:hover { background:var(--hover); }
+.modes { display:flex; background:var(--border-soft); padding:4px; border-radius:8px; border:1px solid var(--border); }
+.mode-btn { display:flex; align-items:center; gap:8px; padding:8px 16px; border-radius:6px; font-size:13px; font-weight:500; color:var(--muted); background:transparent; border:none; cursor:pointer; transition:all .15s; font-family:inherit; }
+.mode-btn.active { background:var(--panel); color:var(--accent); box-shadow:var(--shadow); }
+.mode-btn:not(.active):hover { color:var(--text); }
+.grid { display:grid; grid-template-columns:1fr; gap:24px; height:calc(100vh - 180px); min-height:600px; }
+@media(min-width:1024px){ .grid{ grid-template-columns:1fr 1fr; } }
+.col { display:flex; flex-direction:column; gap:16px; height:100%; }
+.col.scroll { overflow-y:auto; padding-right:8px; padding-bottom:8px; }
+.col-head { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+.col-head .label { font-size:13px; font-weight:700; color:var(--text); }
+.panel { display:flex; flex-direction:column; background:var(--panel); border-radius:var(--radius); border:1px solid var(--border); box-shadow:var(--shadow); overflow:hidden; }
+.panel.fill { height:100%; }
+.panel.flex1 { flex:1; min-height:0; }
+.panel.block { min-height:250px; flex-shrink:0; }
+.panel-head { display:flex; align-items:center; justify-content:space-between; padding:10px 14px; border-bottom:1px solid var(--border-soft); background:var(--head); }
+.panel-head .left { display:flex; align-items:center; gap:8px; color:var(--text); font-weight:500; min-width:0; }
+.panel-head .picon { font-size:15px; }
+.panel-head .plabel { font-size:13px; color:var(--muted); }
+.fname { background:transparent; border:none; border-bottom:1px solid transparent; font-size:13px; font-weight:700; color:var(--text); padding:2px 4px; width:128px; font-family:inherit; }
+.fname:hover { border-bottom-color:var(--border); }
+.fname:focus { outline:none; border-bottom-color:var(--accent); }
+.panel-head .right { display:flex; align-items:center; gap:2px; }
+.iconbtn { background:transparent; border:none; color:var(--faint); padding:6px; border-radius:6px; cursor:pointer; font-size:14px; line-height:1; transition:all .15s; }
+.iconbtn:hover { color:var(--text); background:var(--hover); }
+.iconbtn:disabled { opacity:.4; cursor:not-allowed; }
+.iconbtn.danger { color:var(--red); }
+.iconbtn.danger:hover { background:var(--red-soft); }
+.iconbtn.copied { color:var(--green); }
+.ta { flex:1; width:100%; padding:14px; font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:13px; line-height:1.5; resize:none; border:none; background:transparent; color:var(--text); }
+.ta:focus { outline:none; box-shadow:inset 0 0 0 2px rgba(37,99,235,.4); }
+.ta[readonly] { background:rgba(0,0,0,.015); }
+[data-theme="dark"] .ta[readonly] { background:rgba(255,255,255,.02); }
+.panel-foot { display:flex; justify-content:flex-end; gap:16px; padding:6px 12px; border-top:1px solid var(--border-soft); background:var(--head); font-size:11px; color:var(--faint); font-family:ui-monospace,monospace; user-select:none; }
+.btn { display:inline-flex; align-items:center; gap:6px; padding:7px 12px; font-size:13px; font-weight:500; border-radius:6px; border:none; cursor:pointer; color:#fff; box-shadow:var(--shadow); transition:background .15s; font-family:inherit; }
+.btn:disabled { opacity:.5; cursor:not-allowed; }
+.btn-blue { background:var(--accent); }
+.btn-blue:hover:not(:disabled) { background:var(--accent-h); }
+.btn-soft { background:var(--accent-soft); }
+.btn-green { background:var(--green); }
+.btn-green:hover:not(:disabled) { background:var(--green-h); }
+.addbtn { display:flex; align-items:center; justify-content:center; gap:8px; width:100%; padding:12px; border:2px dashed var(--border); color:var(--muted); background:transparent; border-radius:var(--radius); cursor:pointer; font-weight:500; font-size:13px; flex-shrink:0; transition:all .15s; font-family:inherit; }
+.addbtn:hover { background:var(--hover); border-color:var(--faint); color:var(--text); }
+.hidden { display:none; }
+</style>
 </head>
 <body>
-  <div id="root"></div>
+<div id="app"></div>
+<script>
+(function () {
+  'use strict';
 
-  <script type="text/babel" data-presets="react" data-type="script">
-    const { useState, useEffect, useRef } = React;
+  /* ===== Config ===== */
+  const ICONS = {
+    app:'🧰', input:'📄', html:'🌐', css:'🎨', js:'📜', output:'📦',
+    copy:'📋', copied:'✅', download:'⬇️', importFile:'📂', bulk:'📥',
+    trash:'🗑️', up:'↑', down:'↓', sort:'🪄', add:'＋',
+    decompose:'✂️', compose:'🧩', composeJs:'📜', sun:'☀️', moon:'🌙'
+  };
 
-    // --- Utility Functions ---
+  /* ===== Store ===== */
+  const state = {
+    mode:'decompose',
+    removeComments:false,
+    theme:'light',
+    decomposeInput:'',
+    decomposeInputFilename:'index.html',
+    decomposeHtmlFilename:'index.html',
+    decomposeCssFilename:'style.css',
+    decomposeJsFilename:'script.js',
+    composeHtml:'',
+    composeCss:'',
+    composeHtmlFilename:'index.html',
+    composeCssFilename:'style.css',
+    composeOutputFilename:'index.html',
+    composeJsOutputFilename:'bundle.js',
+    jsList:[{ id:Date.now(), content:'', filename:'script.js' }]
+  };
+  let currentPanels = [];
 
-    // 正規表現のエスケープ
-    const escapeRegExp = (string) => string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  /* ===== Utils ===== */
+  const escapeRegExp = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const stripHtmlComments = (s) => s.replace(/<!--[\s\S]*?-->/g, '');
+  const stripCssComments = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '');
+  const stripJsComments = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(?<!:)\/\/.*$/gm, '');
 
-    // コメント削除用のユーティリティ関数
-    const stripHtmlComments = (str) => str.replace(/<!--[\s\S]*?-->/g, '');
-    const stripCssComments = (str) => str.replace(/\/\*[\s\S]*?\*\//g, '');
-    const stripJsComments = (str) => {
-      return str
-        .replace(/\/\*[\s\S]*?\*\//g, '') // 複数行コメント /* ... */
-        .replace(/(?<!:)\/\/.*$/gm, '');  // 単一行コメント // ... (http://等のURLは除外)
-    };
+  function fallbackCopy(text) {
+    const ta = document.createElement('textarea');
+    ta.value = text; ta.style.position = 'fixed'; ta.style.top = '0'; ta.style.left = '0';
+    document.body.appendChild(ta); ta.focus(); ta.select();
+    try { document.execCommand('copy'); } catch (e) {}
+    document.body.removeChild(ta);
+  }
+  function copyToClipboard(text) {
+    if (!text) return;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).catch(() => fallbackCopy(text));
+    } else { fallbackCopy(text); }
+  }
+  function downloadFile(filename, content) {
+    if (!content) return;
+    const a = document.createElement('a');
+    const blob = new Blob([content], { type:'text/plain' });
+    a.href = URL.createObjectURL(blob); a.download = filename;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(a.href);
+  }
+  function el(tag, props, children) {
+    props = props || {};
+    const node = document.createElement(tag);
+    for (const k in props) {
+      const v = props[k];
+      if (k === 'class') node.className = v;
+      else if (k === 'html') node.innerHTML = v;
+      else if (k.slice(0,2) === 'on' && typeof v === 'function') node.addEventListener(k.slice(2).toLowerCase(), v);
+      else if (v !== null && v !== undefined && v !== false) node.setAttribute(k, v);
+    }
+    const kids = Array.isArray(children) ? children : (children != null ? [children] : []);
+    kids.forEach((c) => { if (c == null || c === false) return; node.appendChild(typeof c === 'string' ? document.createTextNode(c) : c); });
+    return node;
+  }
 
-    // クリップボードへのコピー
-    const copyToClipboard = (text) => {
-      const textArea = document.createElement("textarea");
-      textArea.value = text;
-      textArea.style.top = "0";
-      textArea.style.left = "0";
-      textArea.style.position = "fixed";
-      
-      document.body.appendChild(textArea);
-      textArea.focus();
-      textArea.select();
-      try {
-        document.execCommand('copy');
-      } catch (err) {
-        console.error('コピーに失敗しました', err);
+  // --- core: HTMLを HTML/CSS/JS に分解 ---
+  function decomposeHtml(source, cssFilename, jsFilename, removeComments) {
+    cssFilename = cssFilename || 'style.css'; jsFilename = jsFilename || 'script.js';
+    let css = [], js = [], html = source || '';
+    if (removeComments) html = stripHtmlComments(html);
+    html = html.replace(/<style[^>]*>([\s\S]*?)<\/style>/gi, (m, p1) => { if (p1.trim()) css.push(p1.trim()); return ''; });
+    html = html.replace(/<script(?:(?!\bsrc=)[^>])*>([\s\S]*?)<\/script>/gi, (m, p1) => { if (p1.trim()) js.push(p1.trim()); return ''; });
+    let finalCss = css.join('\n\n').trim(), finalJs = js.join('\n\n').trim();
+    if (removeComments) { finalCss = stripCssComments(finalCss); finalJs = stripJsComments(finalJs); }
+    if (finalCss) {
+      const linkTag = `<link rel="stylesheet" href="${cssFilename}">`;
+      if (html.match(/<\/head>/i)) html = html.replace(/<\/head>/i, `  ${linkTag}\n</head>`);
+      else html = `${linkTag}\n${html}`;
+    }
+    if (finalJs) {
+      const scriptTag = `<script src="${jsFilename}"><\/script>`;
+      if (html.match(/<\/body>/i)) html = html.replace(/<\/body>/i, `  ${scriptTag}\n</body>`);
+      else html = `${html}\n${scriptTag}`;
+    }
+    return { html: html.trim(), css: finalCss, js: finalJs };
+  }
+
+  // --- core: 複数 JS をモジュール構文除去のうえ結合 ---
+  function composeJs(jsList, removeComments) {
+    return jsList.map((j) => {
+      let content = j.content.trim();
+      if (removeComments) content = stripJsComments(content);
+      content = content.replace(/import\s+[\s\S]*?from\s+['"][^'"]+['"]\s*;?/g, '');
+      content = content.replace(/import\s+['"][^'"]+['"]\s*;?/g, '');
+      content = content.replace(/export\s+\{[\s\S]*?\}\s*(?:from\s+['"][^'"]+['"]\s*)?;?/g, '');
+      content = content.replace(/export\s+\*\s+from\s+['"][^'"]+['"]\s*;?/g, '');
+      content = content.replace(/export\s+default\s+/g, '');
+      content = content.replace(/export\s+(async\s+function)\b/g, '$1');
+      content = content.replace(/export\s+(const|let|var|function|class)\b/g, '$1');
+      return content.trim();
+    }).filter(Boolean).join('\n\n');
+  }
+
+  // --- core: HTML/CSS/JS群を1つのHTMLに結合 ---
+  function composeHtml(html, css, jsList, cssFilename, removeComments) {
+    let result = html || '';
+    if (removeComments) result = stripHtmlComments(result);
+    if (cssFilename) {
+      const cssRegex = new RegExp(`<link[^>]*href=["'][^"']*?(?:\\/)?${escapeRegExp(cssFilename)}["'][^>]*>\\n?`, 'gi');
+      result = result.replace(cssRegex, '');
+    }
+    jsList.forEach((js) => {
+      if (js.filename) {
+        const jsRegex = new RegExp(`<script[^>]*src=["'][^"']*?(?:\\/)?${escapeRegExp(js.filename)}["'][^>]*><\\/script>\\n?`, 'gi');
+        result = result.replace(jsRegex, '');
       }
-      document.body.removeChild(textArea);
-    };
-
-    // ファイルダウンロード機能
-    const downloadFile = (filename, content) => {
-      if (!content) return;
-      const element = document.createElement("a");
-      const file = new Blob([content], { type: 'text/plain' });
-      element.href = URL.createObjectURL(file);
-      element.download = filename;
-      document.body.appendChild(element);
-      element.click();
-      document.body.removeChild(element);
-    };
-
-    // HTMLからCSSとJSを抽出して分解する
-    const decomposeHtml = (source, cssFilename = 'style.css', jsFilename = 'script.js', removeComments = false) => {
-      let css = [];
-      let js = [];
-      let html = source || '';
-      
-      if (removeComments) {
-        html = stripHtmlComments(html);
-      }
-
-      html = html.replace(/<style[^>]*>([\s\S]*?)<\/style>/gi, (match, p1) => {
-        if (p1.trim()) css.push(p1.trim());
-        return '';
-      });
-
-      html = html.replace(/<script(?:(?!\bsrc=)[^>])*>([\s\S]*?)<\/script>/gi, (match, p1) => {
-        if (p1.trim()) js.push(p1.trim());
-        return '';
-      });
-
-      let finalCss = css.join('\n\n').trim();
-      let finalJs = js.join('\n\n').trim();
-
-      if (removeComments) {
-        finalCss = stripCssComments(finalCss);
-        finalJs = stripJsComments(finalJs);
-      }
-
-      if (finalCss) {
-        const linkTag = `<link rel="stylesheet" href="${cssFilename}">`;
-        if (html.match(/<\/head>/i)) {
-          html = html.replace(/<\/head>/i, `  ${linkTag}\n</head>`);
-        } else {
-          html = `${linkTag}\n${html}`;
-        }
-      }
-
-      if (finalJs) {
-        const scriptTag = `<script src="${jsFilename}"><\/script>`;
-        if (html.match(/<\/body>/i)) {
-          html = html.replace(/<\/body>/i, `  ${scriptTag}\n</body>`);
-        } else {
-          html = `${html}\n${scriptTag}`;
-        }
-      }
-
-      return {
-        html: html.trim(),
-        css: finalCss,
-        js: finalJs
-      };
-    };
-
-    // 新規: 複数JSの結合・無害化処理（独立した関数）
-    const composeJs = (jsList, removeComments = false) => {
-      return jsList.map(j => {
-        let content = j.content.trim();
-        
-        if (removeComments) {
-          content = stripJsComments(content);
-        }
-
-        // --- モジュール構文 (import/export) の削除・無害化 ---
-        content = content.replace(/import\s+[\s\S]*?from\s+['"][^'"]+['"]\s*;?/g, '');
-        content = content.replace(/import\s+['"][^'"]+['"]\s*;?/g, '');
-        content = content.replace(/export\s+\{[\s\S]*?\}\s*(?:from\s+['"][^'"]+['"]\s*)?;?/g, '');
-        content = content.replace(/export\s+\*\s+from\s+['"][^'"]+['"]\s*;?/g, '');
-        content = content.replace(/export\s+default\s+/g, '');
-        content = content.replace(/export\s+(async\s+function)\b/g, '$1');
-        content = content.replace(/export\s+(const|let|var|function|class)\b/g, '$1');
-
-        return content.trim();
-      }).filter(Boolean).join('\n\n');
-    };
-
-    // HTML, CSS, JSを1つのHTMLに結合する
-    const composeHtml = (html, css, jsList, cssFilename, removeComments = false) => {
-      let result = html || '';
-      
-      if (removeComments) {
-        result = stripHtmlComments(result);
-      }
-
-      // 動的なファイル名に基づいて外部読み込みタグを削除する
-      if (cssFilename) {
-        // ./style.css などのパス付きにも対応
-        const cssRegex = new RegExp(`<link[^>]*href=["'][^"']*?(?:\\/)?${escapeRegExp(cssFilename)}["'][^>]*>\\n?`, 'gi');
-        result = result.replace(cssRegex, '');
-      }
-      
-      jsList.forEach(js => {
-        if (js.filename) {
-          // type="module" や ./app.js などのパス付きスクリプトタグも確実に削除
-          const jsRegex = new RegExp(`<script[^>]*src=["'][^"']*?(?:\\/)?${escapeRegExp(js.filename)}["'][^>]*><\\/script>\\n?`, 'gi');
-          result = result.replace(jsRegex, '');
-        }
-      });
-      
-      const combinedJs = composeJs(jsList, removeComments);
-
-      let finalCss = css ? css.trim() : '';
-      if (removeComments && finalCss) {
-        finalCss = stripCssComments(finalCss);
-      }
-
-      if (finalCss) {
-        const styleTag = `<style>\n${finalCss}\n<\/style>`;
-        if (result.match(/<\/head>/i)) {
-          result = result.replace(/<\/head>/i, `${styleTag}\n</head>`);
-        } else {
-          result = `${styleTag}\n${result}`;
-        }
-      }
-
-      if (combinedJs && combinedJs.trim()) {
-        const scriptTag = `<script>\n${combinedJs.trim()}\n<\/script>`;
-        if (result.match(/<\/body>/i)) {
-          result = result.replace(/<\/body>/i, `${scriptTag}\n</body>`);
-        } else {
-          result = `${result}\n${scriptTag}`;
-        }
-      }
-
-      return result.trim();
-    };
-
-    // --- Components ---
-
-    const Icon = ({ name, size = 16, className = "" }) => (
-      <i className={`${name} ${className}`} style={{ fontSize: size }}></i>
-    );
-
-    const EditorPanel = ({ label, iconName, value, onChange, readOnly, placeholder, className = "", filename, onFilenameChange, onImport, accept, showRemove, onRemove, showMoveUp, onMoveUp, showMoveDown, onMoveDown }) => {
-      const [copied, setCopied] = useState(false);
-      const fileInputRef = useRef(null);
-
-      const textValue = value || '';
-      const charCount = textValue.length;
-      const lineCount = textValue === '' ? 0 : textValue.split('\n').length;
-
-      const handleCopy = () => {
-        if (!value) return;
-        copyToClipboard(value);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
-      };
-
-      const handleDownload = () => {
-        if (!value || !filename) return;
-        downloadFile(filename, value);
-      };
-
-      const handleFileChange = (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-        const reader = new FileReader();
-        reader.onload = (event) => {
-          if (onImport) onImport(event.target.result, file.name);
-        };
-        reader.readAsText(file);
-        e.target.value = null;
-      };
-
-      return (
-        <div className={`flex flex-col bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden ${className}`}>
-          <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 bg-gray-50/50">
-            <div className="flex items-center gap-2 text-gray-700 font-medium">
-              <Icon name={iconName} size={16} className="text-blue-500" />
-              {label && <span className="text-sm text-gray-500">{label}</span>}
-              {filename !== undefined && (
-                <input
-                  type="text"
-                  value={filename}
-                  onChange={(e) => onFilenameChange && onFilenameChange(e.target.value)}
-                  className="bg-transparent border-b border-transparent hover:border-gray-300 focus:border-blue-500 focus:outline-none text-sm px-1 py-0.5 w-32 font-bold text-gray-800"
-                  title="ファイル名を編集"
-                />
-              )}
-            </div>
-            <div className="flex items-center gap-1">
-              {showMoveUp && (
-                <button
-                  onClick={onMoveUp}
-                  className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
-                  title="上に移動"
-                >
-                  <Icon name="fa-solid fa-arrow-up" />
-                </button>
-              )}
-              {showMoveDown && (
-                <button
-                  onClick={onMoveDown}
-                  className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
-                  title="下に移動"
-                >
-                  <Icon name="fa-solid fa-arrow-down" />
-                </button>
-              )}
-              {onImport && (
-                <>
-                  <input type="file" accept={accept} onChange={handleFileChange} ref={fileInputRef} className="hidden" />
-                  <button
-                    onClick={() => fileInputRef.current?.click()}
-                    className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
-                    title="ファイルから読み込む"
-                  >
-                    <Icon name="fa-solid fa-folder-open" />
-                  </button>
-                </>
-              )}
-              {filename && (
-                <button
-                  onClick={handleDownload}
-                  disabled={!value}
-                  className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  title={`${filename} としてダウンロード`}
-                >
-                  <Icon name="fa-solid fa-download" />
-                </button>
-              )}
-              {showRemove && (
-                <button
-                  onClick={onRemove}
-                  className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
-                  title="このパネルを削除"
-                >
-                  <Icon name="fa-solid fa-trash" />
-                </button>
-              )}
-              <button
-                onClick={handleCopy}
-                disabled={!value}
-                className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                title="クリップボードにコピー"
-              >
-                {copied ? <Icon name="fa-solid fa-check" className="text-green-500" /> : <Icon name="fa-regular fa-copy" />}
-              </button>
-            </div>
-          </div>
-          <textarea
-            value={value}
-            onChange={(e) => onChange && onChange(e.target.value)}
-            readOnly={readOnly}
-            placeholder={placeholder}
-            spellCheck={false}
-            className={`flex-1 w-full p-4 font-mono text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500/50 bg-transparent text-gray-800 ${readOnly ? 'bg-gray-50/30' : ''}`}
-          />
-          <div className="bg-gray-50/80 border-t border-gray-100 px-3 py-1.5 flex justify-end gap-4 text-xs text-gray-400 font-mono select-none">
-            <span>{lineCount} 行</span>
-            <span>{charCount} 文字</span>
-          </div>
-        </div>
-      );
-    };
-
-    // --- Main App Component ---
-
-    function App() {
-      const [mode, setMode] = useState('decompose');
-      const [removeComments, setRemoveComments] = useState(false); // コメント削除状態の管理
-      
-      // ファイル名の状態管理
-      const [decomposeInputFilename, setDecomposeInputFilename] = useState('index.html');
-      const [decomposeHtmlFilename, setDecomposeHtmlFilename] = useState('index.html');
-      const [decomposeCssFilename, setDecomposeCssFilename] = useState('style.css');
-      const [decomposeJsFilename, setDecomposeJsFilename] = useState('script.js');
-
-      const [composeOutputFilename, setComposeOutputFilename] = useState('index.html');
-      const [composeHtmlFilename, setComposeHtmlFilename] = useState('index.html');
-      const [composeCssFilename, setComposeCssFilename] = useState('style.css');
-
-      // JS結合モード用のファイル名
-      const [composeJsOutputFilename, setComposeJsOutputFilename] = useState('bundle.js');
-
-      const [inputCombined, setInputCombined] = useState('');
-      const [inputSplitHtml, setInputSplitHtml] = useState('');
-      const [inputSplitCss, setInputSplitCss] = useState('');
-      const [inputSplitJsList, setInputSplitJsList] = useState([{ id: Date.now(), content: '', filename: 'script.js' }]);
-
-      const bulkInputRef = useRef(null);
-
-      useEffect(() => {
-        const decomposed = decomposeHtml(inputCombined, decomposeCssFilename, decomposeJsFilename, removeComments);
-        setInputSplitHtml(decomposed.html);
-        setInputSplitCss(decomposed.css);
-        setInputSplitJsList([{ id: Date.now(), content: decomposed.js, filename: decomposeJsFilename }]);
-      }, []);
-
-      const updateJs = (id, content) => {
-        setInputSplitJsList(prev => prev.map(item => item.id === id ? { ...item, content } : item));
-      };
-
-      const updateJsFilename = (id, filename) => {
-        setInputSplitJsList(prev => prev.map(item => item.id === id ? { ...item, filename } : item));
-      };
-
-      // JSの自動並び替え処理のコアロジック
-      const sortJsList = (jsList) => {
-        if (jsList.length <= 1) return jsList;
-
-        const nodes = new Map();
-        jsList.forEach(js => {
-          nodes.set(js.filename, { item: js, dependencies: [] });
-        });
-
-        const importRegex = /import\s+[\s\S]*?from\s+['"]([^'"]+)['"]/g;
-        const importRegex2 = /import\s+['"]([^'"]+)['"]/g;
-
-        jsList.forEach(js => {
-          const deps = new Set();
-          let match;
-          const content = js.content;
-          
-          while ((match = importRegex.exec(content)) !== null) {
-            const depFilename = match[1].split('/').pop();
-            if (nodes.has(depFilename)) deps.add(depFilename);
-          }
-          
-          while ((match = importRegex2.exec(content)) !== null) {
-            const depFilename = match[1].split('/').pop();
-            if (nodes.has(depFilename)) deps.add(depFilename);
-          }
-
-          const node = nodes.get(js.filename);
-          deps.forEach(depFilename => {
-            if (depFilename !== js.filename) {
-              node.dependencies.push(depFilename);
-            }
-          });
-        });
-
-        const graph = new Map();
-        const inDegree = new Map();
-        nodes.forEach((_, filename) => {
-          graph.set(filename, []);
-          inDegree.set(filename, 0);
-        });
-
-        nodes.forEach((node, filename) => {
-          node.dependencies.forEach(dep => {
-            if (graph.has(dep)) {
-              graph.get(dep).push(filename);
-              inDegree.set(filename, inDegree.get(filename) + 1);
-            }
-          });
-        });
-
-        const queue = [];
-        inDegree.forEach((degree, filename) => {
-          if (degree === 0) queue.push(filename);
-        });
-
-        const sortedFilenames = [];
-        while (queue.length > 0) {
-          const current = queue.shift();
-          sortedFilenames.push(current);
-          graph.get(current).forEach(neighbor => {
-            inDegree.set(neighbor, inDegree.get(neighbor) - 1);
-            if (inDegree.get(neighbor) === 0) {
-              queue.push(neighbor);
-            }
-          });
-        }
-
-        const sortedSet = new Set(sortedFilenames);
-        jsList.forEach(js => {
-          if (!sortedSet.has(js.filename)) {
-            sortedFilenames.push(js.filename);
-            console.warn(`[Auto Sort] 循環依存の可能性があります: ${js.filename}`);
-          }
-        });
-
-        return sortedFilenames.map(filename => nodes.get(filename).item);
-      };
-
-      // ファイル読み込み時に内容とファイル名を更新し、即座にソートする関数
-      const updateJsAndSort = (id, content, filename) => {
-        setInputSplitJsList(prev => {
-          const newList = prev.map(item => item.id === id ? { ...item, content, filename: filename || item.filename } : item);
-          return sortJsList(newList);
-        });
-      };
-
-      const addJsPanel = () => {
-        setInputSplitJsList(prev => [...prev, { id: Date.now(), content: '', filename: `script${prev.length + 1}.js` }]);
-      };
-
-      const removeJsPanel = (id) => {
-        setInputSplitJsList(prev => prev.filter(item => item.id !== id));
-      };
-
-      const moveJsPanel = (index, direction) => {
-        setInputSplitJsList(prev => {
-          const newList = [...prev];
-          if (direction === 'up' && index > 0) {
-            [newList[index - 1], newList[index]] = [newList[index], newList[index - 1]];
-          } else if (direction === 'down' && index < newList.length - 1) {
-            [newList[index], newList[index + 1]] = [newList[index + 1], newList[index]];
-          }
-          return newList;
-        });
-      };
-
-      const handleModeToggle = (newMode) => {
-        if (newMode === mode) return;
-
-        if (newMode === 'compose' || newMode === 'compose-js') {
-          if (mode === 'decompose') {
-            const decomposed = decomposeHtml(inputCombined, decomposeCssFilename, decomposeJsFilename, removeComments);
-            setInputSplitHtml(decomposed.html);
-            setInputSplitCss(decomposed.css);
-            setInputSplitJsList([{ id: Date.now(), content: decomposed.js, filename: decomposeJsFilename }]);
-          }
-        } else if (newMode === 'decompose') {
-          if (mode === 'compose') {
-            const composed = composeHtml(inputSplitHtml, inputSplitCss, inputSplitJsList, composeCssFilename, removeComments);
-            setInputCombined(composed);
-          }
-        }
-        setMode(newMode);
-      };
-
-      // 結合モード：一括インポート処理
-      const handleBulkImport = async (e) => {
-        const files = Array.from(e.target.files);
-        if (files.length === 0) return;
-
-        const readAsText = (file) => new Promise((resolve) => {
-          const reader = new FileReader();
-          reader.onload = (event) => resolve({ name: file.name, text: event.target.result });
-          reader.readAsText(file);
-        });
-
-        const fileDataArray = await Promise.all(files.map(readAsText));
-        let jsFiles = [];
-
-        fileDataArray.forEach(({ name, text }) => {
-          const ext = name.split('.').pop().toLowerCase();
-          if (mode === 'compose') {
-            if (ext === 'html') {
-              setInputSplitHtml(text);
-              setComposeHtmlFilename(name);
-            } else if (ext === 'css') {
-              setInputSplitCss(text);
-              setComposeCssFilename(name);
-            } else if (ext === 'js') {
-              jsFiles.push({ name, text });
-            }
-          } else if (mode === 'compose-js') {
-            if (ext === 'js' || ext === 'txt') {
-              jsFiles.push({ name, text });
-            }
-          }
-        });
-
-        if (jsFiles.length > 0) {
-          setInputSplitJsList(prev => {
-            let newList;
-            if (prev.length === 1 && prev[0].content === '') {
-              newList = jsFiles.map((f, i) => ({ id: Date.now() + i, content: f.text, filename: f.name }));
-            } else {
-              newList = [
-                ...prev,
-                ...jsFiles.map((f, i) => ({ id: Date.now() + i, content: f.text, filename: f.name }))
-              ];
-            }
-            // 一括インポート後に自動ソートを適用
-            return sortJsList(newList);
-          });
-        }
-        e.target.value = null; // リセット
-      };
-
-      // 手動の自動並び替えボタン用
-      const handleAutoSortJs = () => {
-        setInputSplitJsList(prev => sortJsList(prev));
-      };
-
-      const derivedDecomposed = mode === 'decompose' 
-        ? decomposeHtml(inputCombined, decomposeCssFilename, decomposeJsFilename, removeComments) 
-        : { html: '', css: '', js: '' };
-      
-      const derivedComposed = mode === 'compose' 
-        ? composeHtml(inputSplitHtml, inputSplitCss, inputSplitJsList, composeCssFilename, removeComments) 
-        : '';
-
-      const derivedComposedJs = mode === 'compose-js'
-        ? composeJs(inputSplitJsList, removeComments)
-        : '';
-
-      const handleDownloadAll = () => {
-        if (derivedDecomposed.html) downloadFile(decomposeHtmlFilename, derivedDecomposed.html);
-        if (derivedDecomposed.css) {
-          setTimeout(() => downloadFile(decomposeCssFilename, derivedDecomposed.css), 200);
-        }
-        if (derivedDecomposed.js) {
-          setTimeout(() => downloadFile(decomposeJsFilename, derivedDecomposed.js), 400);
-        }
-      };
-
-      return (
-        <div className="min-h-screen bg-gray-50 text-gray-900 p-4 md:p-8 font-sans transition-colors duration-200">
-          <div className="max-w-7xl mx-auto space-y-6">
-            
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-              <div>
-                <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-gray-900 flex items-center gap-3">
-                  <Icon name="fa-solid fa-code" className="text-blue-500" size={28} />
-                  HTML ToolKit
-                </h1>
-                <p className="text-sm text-gray-500 mt-1">
-                  インラインHTMLの分解と、HTML/CSS/JSの結合を行うユーティリティ
-                </p>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-4">
-                {/* コメント自動削除トグル */}
-                <label className="flex items-center gap-2 text-sm font-medium text-gray-700 cursor-pointer hover:text-gray-900 bg-white px-3 py-2 rounded-lg border border-gray-200 shadow-sm transition-colors">
-                  <input
-                    type="checkbox"
-                    checked={removeComments}
-                    onChange={(e) => setRemoveComments(e.target.checked)}
-                    className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500 cursor-pointer"
-                  />
-                  コメント自動削除
-                </label>
-
-                {/* モード切り替え */}
-                <div className="flex bg-gray-200/50 p-1 rounded-lg border border-gray-200">
-                  <button
-                    onClick={() => handleModeToggle('decompose')}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${
-                      mode === 'decompose' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-600 hover:text-gray-900'
-                    }`}
-                  >
-                    <Icon name="fa-solid fa-arrows-split-up-and-left" />
-                    HTML分解
-                  </button>
-                  <button
-                    onClick={() => handleModeToggle('compose')}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${
-                      mode === 'compose' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-600 hover:text-gray-900'
-                    }`}
-                  >
-                    <Icon name="fa-solid fa-object-group" />
-                    HTML結合
-                  </button>
-                  <button
-                    onClick={() => handleModeToggle('compose-js')}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${
-                      mode === 'compose-js' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-600 hover:text-gray-900'
-                    }`}
-                  >
-                    <Icon name="fa-brands fa-js" />
-                    JSのみ結合
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-[calc(100vh-180px)] min-h-[600px]">
-              
-              {/* --- 分解モード --- */}
-              {mode === 'decompose' && (
-                <>
-                  <EditorPanel
-                    label="入力HTML"
-                    filename={decomposeInputFilename}
-                    onFilenameChange={setDecomposeInputFilename}
-                    iconName="fa-solid fa-file-code"
-                    value={inputCombined}
-                    onChange={setInputCombined}
-                    onImport={(content, name) => {
-                      setInputCombined(content);
-                      if (name) setDecomposeInputFilename(name);
-                    }}
-                    accept=".html,.txt"
-                    placeholder="ここに <style> や <script> を含むHTMLを貼り付けてください..."
-                    className="h-full"
-                  />
-                  
-                  <div className="flex flex-col gap-4 h-full">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-bold text-gray-700">抽出されたファイル</span>
-                      <button
-                        onClick={handleDownloadAll}
-                        disabled={!derivedDecomposed.html && !derivedDecomposed.css && !derivedDecomposed.js}
-                        className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
-                        title="3つのファイルを一括でダウンロード"
-                      >
-                        <Icon name="fa-solid fa-cloud-arrow-down" />
-                        一括ダウンロード
-                      </button>
-                    </div>
-                    <EditorPanel
-                      filename={decomposeHtmlFilename}
-                      onFilenameChange={setDecomposeHtmlFilename}
-                      iconName="fa-brands fa-html5"
-                      value={derivedDecomposed.html}
-                      readOnly={true}
-                      className="flex-1 min-h-0"
-                    />
-                    <EditorPanel
-                      filename={decomposeCssFilename}
-                      onFilenameChange={setDecomposeCssFilename}
-                      iconName="fa-brands fa-css3-alt"
-                      value={derivedDecomposed.css}
-                      readOnly={true}
-                      className="flex-1 min-h-0"
-                    />
-                    <EditorPanel
-                      filename={decomposeJsFilename}
-                      onFilenameChange={setDecomposeJsFilename}
-                      iconName="fa-brands fa-js"
-                      value={derivedDecomposed.js}
-                      readOnly={true}
-                      className="flex-1 min-h-0"
-                    />
-                  </div>
-                </>
-              )}
-
-              {/* --- 結合モード --- */}
-              {mode === 'compose' && (
-                <>
-                  <div className="flex flex-col gap-4 h-full overflow-y-auto pr-2 pb-2">
-                    <div className="flex items-center justify-between pb-1">
-                      <span className="text-sm font-bold text-gray-700">結合するファイル群</span>
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={handleAutoSortJs}
-                          disabled={inputSplitJsList.length <= 1}
-                          className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-blue-500 hover:bg-blue-600 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
-                          title="JSのimport文を解析して依存関係の順に並び替えます"
-                        >
-                          <Icon name="fa-solid fa-wand-magic-sparkles" />
-                          自動並び替え
-                        </button>
-                        <button
-                          onClick={() => bulkInputRef.current?.click()}
-                          className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-md transition-colors shadow-sm"
-                          title="複数ファイルをまとめて読み込みます"
-                        >
-                          <Icon name="fa-solid fa-file-import" />
-                          一括インポート
-                        </button>
-                      </div>
-                      <input type="file" multiple accept=".html,.css,.js,.txt" onChange={handleBulkImport} className="hidden" ref={bulkInputRef} />
-                    </div>
-
-                    <EditorPanel
-                      filename={composeHtmlFilename}
-                      onFilenameChange={setComposeHtmlFilename}
-                      iconName="fa-brands fa-html5"
-                      value={inputSplitHtml}
-                      onChange={setInputSplitHtml}
-                      onImport={(content, name) => {
-                        setInputSplitHtml(content);
-                        if (name) setComposeHtmlFilename(name);
-                      }}
-                      accept=".html,.txt"
-                      placeholder="HTMLコードを入力..."
-                      className="min-h-[250px] flex-shrink-0"
-                    />
-                    <EditorPanel
-                      filename={composeCssFilename}
-                      onFilenameChange={setComposeCssFilename}
-                      iconName="fa-brands fa-css3-alt"
-                      value={inputSplitCss}
-                      onChange={setInputSplitCss}
-                      onImport={(content, name) => {
-                        setInputSplitCss(content);
-                        if (name) setComposeCssFilename(name);
-                      }}
-                      accept=".css,.txt"
-                      placeholder="CSSコードを入力..."
-                      className="min-h-[250px] flex-shrink-0"
-                    />
-                    
-                    {inputSplitJsList.map((jsItem, index) => (
-                      <EditorPanel
-                        key={jsItem.id}
-                        filename={jsItem.filename}
-                        onFilenameChange={(val) => updateJsFilename(jsItem.id, val)}
-                        iconName="fa-brands fa-js"
-                        value={jsItem.content}
-                        onChange={(val) => updateJs(jsItem.id, val)}
-                        onImport={(content, name) => {
-                          updateJsAndSort(jsItem.id, content, name);
-                        }}
-                        accept=".js,.txt"
-                        showRemove={inputSplitJsList.length > 1}
-                        onRemove={() => removeJsPanel(jsItem.id)}
-                        showMoveUp={index > 0}
-                        onMoveUp={() => moveJsPanel(index, 'up')}
-                        showMoveDown={index < inputSplitJsList.length - 1}
-                        onMoveDown={() => moveJsPanel(index, 'down')}
-                        placeholder="JavaScriptコードを入力..."
-                        className="min-h-[250px] flex-shrink-0"
-                      />
-                    ))}
-                    
-                    <button
-                      onClick={addJsPanel}
-                      className="flex items-center justify-center gap-2 w-full py-3 border-2 border-dashed border-gray-300 text-gray-500 rounded-xl hover:bg-gray-50 hover:border-gray-400 hover:text-gray-700 transition-colors font-medium flex-shrink-0"
-                    >
-                      <Icon name="fa-solid fa-plus" />
-                      JavaScriptファイルを追加
-                    </button>
-                  </div>
-
-                  <EditorPanel
-                    label="出力HTML"
-                    filename={composeOutputFilename}
-                    onFilenameChange={setComposeOutputFilename}
-                    iconName="fa-solid fa-file-code"
-                    value={derivedComposed}
-                    readOnly={true}
-                    className="h-full"
-                  />
-                </>
-              )}
-
-              {/* --- JS結合モード --- */}
-              {mode === 'compose-js' && (
-                <>
-                  <div className="flex flex-col gap-4 h-full overflow-y-auto pr-2 pb-2">
-                    <div className="flex items-center justify-between pb-1">
-                      <span className="text-sm font-bold text-gray-700">結合するJSファイル群</span>
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={handleAutoSortJs}
-                          disabled={inputSplitJsList.length <= 1}
-                          className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-blue-500 hover:bg-blue-600 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
-                          title="JSのimport文を解析して依存関係の順に並び替えます"
-                        >
-                          <Icon name="fa-solid fa-wand-magic-sparkles" />
-                          自動並び替え
-                        </button>
-                        <button
-                          onClick={() => bulkInputRef.current?.click()}
-                          className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-md transition-colors shadow-sm"
-                          title="複数ファイルをまとめて読み込みます"
-                        >
-                          <Icon name="fa-solid fa-file-import" />
-                          一括インポート
-                        </button>
-                      </div>
-                      <input type="file" multiple accept=".js,.txt" onChange={handleBulkImport} className="hidden" ref={bulkInputRef} />
-                    </div>
-
-                    {inputSplitJsList.map((jsItem, index) => (
-                      <EditorPanel
-                        key={jsItem.id}
-                        filename={jsItem.filename}
-                        onFilenameChange={(val) => updateJsFilename(jsItem.id, val)}
-                        iconName="fa-brands fa-js"
-                        value={jsItem.content}
-                        onChange={(val) => updateJs(jsItem.id, val)}
-                        onImport={(content, name) => {
-                          updateJsAndSort(jsItem.id, content, name);
-                        }}
-                        accept=".js,.txt"
-                        showRemove={inputSplitJsList.length > 1}
-                        onRemove={() => removeJsPanel(jsItem.id)}
-                        showMoveUp={index > 0}
-                        onMoveUp={() => moveJsPanel(index, 'up')}
-                        showMoveDown={index < inputSplitJsList.length - 1}
-                        onMoveDown={() => moveJsPanel(index, 'down')}
-                        placeholder="JavaScriptコードを入力..."
-                        className="min-h-[250px] flex-shrink-0"
-                      />
-                    ))}
-                    
-                    <button
-                      onClick={addJsPanel}
-                      className="flex items-center justify-center gap-2 w-full py-3 border-2 border-dashed border-gray-300 text-gray-500 rounded-xl hover:bg-gray-50 hover:border-gray-400 hover:text-gray-700 transition-colors font-medium flex-shrink-0"
-                    >
-                      <Icon name="fa-solid fa-plus" />
-                      JavaScriptファイルを追加
-                    </button>
-                  </div>
-
-                  <EditorPanel
-                    label="出力JS"
-                    filename={composeJsOutputFilename}
-                    onFilenameChange={setComposeJsOutputFilename}
-                    iconName="fa-brands fa-js"
-                    value={derivedComposedJs}
-                    readOnly={true}
-                    className="h-full"
-                  />
-                </>
-              )}
-              
-            </div>
-          </div>
-        </div>
-      );
+    });
+    const combinedJs = composeJs(jsList, removeComments);
+    let finalCss = css ? css.trim() : '';
+    if (removeComments && finalCss) finalCss = stripCssComments(finalCss);
+    if (finalCss) {
+      const styleTag = `<style>\n${finalCss}\n<\/style>`;
+      if (result.match(/<\/head>/i)) result = result.replace(/<\/head>/i, `${styleTag}\n</head>`);
+      else result = `${styleTag}\n${result}`;
+    }
+    if (combinedJs && combinedJs.trim()) {
+      const scriptTag = `<script>\n${combinedJs.trim()}\n<\/script>`;
+      if (result.match(/<\/body>/i)) result = result.replace(/<\/body>/i, `${scriptTag}\n</body>`);
+      else result = `${result}\n${scriptTag}`;
+    }
+    return result.trim();
+  }
+
+  // --- core: import解析による依存順トポロジカルソート ---
+  function sortJsList(jsList) {
+    if (jsList.length <= 1) return jsList;
+    const nodes = new Map();
+    jsList.forEach((js) => nodes.set(js.filename, { item: js, dependencies: [] }));
+    const importRegex = /import\s+[\s\S]*?from\s+['"]([^'"]+)['"]/g;
+    const importRegex2 = /import\s+['"]([^'"]+)['"]/g;
+    jsList.forEach((js) => {
+      const deps = new Set(); let match; const content = js.content;
+      while ((match = importRegex.exec(content)) !== null) { const d = match[1].split('/').pop(); if (nodes.has(d)) deps.add(d); }
+      while ((match = importRegex2.exec(content)) !== null) { const d = match[1].split('/').pop(); if (nodes.has(d)) deps.add(d); }
+      const node = nodes.get(js.filename);
+      deps.forEach((d) => { if (d !== js.filename) node.dependencies.push(d); });
+    });
+    const graph = new Map(), inDegree = new Map();
+    nodes.forEach((_, f) => { graph.set(f, []); inDegree.set(f, 0); });
+    nodes.forEach((node, f) => { node.dependencies.forEach((dep) => { if (graph.has(dep)) { graph.get(dep).push(f); inDegree.set(f, inDegree.get(f) + 1); } }); });
+    const queue = []; inDegree.forEach((d, f) => { if (d === 0) queue.push(f); });
+    const sorted = [];
+    while (queue.length) { const cur = queue.shift(); sorted.push(cur); graph.get(cur).forEach((n) => { inDegree.set(n, inDegree.get(n) - 1); if (inDegree.get(n) === 0) queue.push(n); }); }
+    const set = new Set(sorted);
+    jsList.forEach((js) => { if (!set.has(js.filename)) { sorted.push(js.filename); console.warn(`[Auto Sort] 循環依存の可能性があります: ${js.filename}`); } });
+    return sorted.map((f) => nodes.get(f).item);
+  }
+
+  /* ===== Panels ===== */
+  function makeCounts() {
+    const line = el('span', {}, '0 行');
+    const char = el('span', {}, '0 文字');
+    const foot = el('div', { class:'panel-foot' }, [line, char]);
+    return { foot, line, char };
+  }
+  function setCounts(c, value) {
+    const v = value || '';
+    const lines = v === '' ? 0 : v.split('\n').length;
+    c.line.textContent = lines + ' 行';
+    c.char.textContent = v.length + ' 文字';
+  }
+
+  function EditorPanel(cfg) {
+    const counts = makeCounts();
+    const ta = el('textarea', { class:'ta', spellcheck:'false', placeholder: cfg.placeholder || '' });
+    if (cfg.readOnly) ta.setAttribute('readonly', '');
+    ta.value = cfg.readOnly ? (cfg.compute ? cfg.compute() : '') : (cfg.initial || '');
+    if (!cfg.readOnly && cfg.onChange) ta.addEventListener('input', () => cfg.onChange(ta.value));
+
+    const left = el('div', { class:'left' }, [ el('span', { class:'picon' }, cfg.icon || '') ]);
+    if (cfg.label) left.appendChild(el('span', { class:'plabel' }, cfg.label));
+    let fnameInput = null;
+    if (cfg.filename !== undefined) {
+      fnameInput = el('input', { class:'fname', type:'text', title:'ファイル名を編集', value: cfg.filename });
+      if (cfg.onFilename) fnameInput.addEventListener('input', () => cfg.onFilename(fnameInput.value));
+      left.appendChild(fnameInput);
     }
 
-    const root = ReactDOM.createRoot(document.getElementById('root'));
-    root.render(<App />);
-  </script>
+    const right = el('div', { class:'right' });
+    if (cfg.showUp) right.appendChild(el('button', { class:'iconbtn', title:'上に移動', onClick: cfg.onUp }, ICONS.up));
+    if (cfg.showDown) right.appendChild(el('button', { class:'iconbtn', title:'下に移動', onClick: cfg.onDown }, ICONS.down));
+    if (cfg.onImport) {
+      const file = el('input', { class:'hidden', type:'file', accept: cfg.accept || '' });
+      file.addEventListener('change', (e) => {
+        const f = e.target.files[0]; if (!f) return;
+        const r = new FileReader();
+        r.onload = (ev) => cfg.onImport(ev.target.result, f.name);
+        r.readAsText(f); e.target.value = null;
+      });
+      right.appendChild(el('button', { class:'iconbtn', title:'ファイルから読み込む', onClick: () => file.click() }, ICONS.importFile));
+      right.appendChild(file);
+    }
+    if (cfg.filename !== undefined) {
+      right.appendChild(el('button', { class:'iconbtn', title:'ダウンロード', onClick: () => downloadFile(fnameInput ? fnameInput.value : cfg.filename, ta.value) }, ICONS.download));
+    }
+    if (cfg.showRemove) right.appendChild(el('button', { class:'iconbtn danger', title:'このパネルを削除', onClick: cfg.onRemove }, ICONS.trash));
+    const copyBtn = el('button', { class:'iconbtn', title:'クリップボードにコピー' }, ICONS.copy);
+    copyBtn.addEventListener('click', () => {
+      if (!ta.value) return;
+      copyToClipboard(ta.value);
+      copyBtn.textContent = ICONS.copied; copyBtn.classList.add('copied');
+      setTimeout(() => { copyBtn.textContent = ICONS.copy; copyBtn.classList.remove('copied'); }, 2000);
+    });
+    right.appendChild(copyBtn);
+
+    const head = el('div', { class:'panel-head' }, [left, right]);
+    const panel = el('div', { class:'panel ' + (cfg.className || '') }, [head, ta, counts.foot]);
+    setCounts(counts, ta.value);
+
+    currentPanels.push({ refresh: () => { if (cfg.readOnly && cfg.compute) ta.value = cfg.compute(); setCounts(counts, ta.value); } });
+    return panel;
+  }
+
+  /* ===== Main ===== */
+  function updateOutputs() { currentPanels.forEach((p) => p.refresh()); }
+
+  function updateJs(id, content) { const it = state.jsList.find((x) => x.id === id); if (it) it.content = content; updateOutputs(); }
+  function updateJsFilename(id, filename) { const it = state.jsList.find((x) => x.id === id); if (it) it.filename = filename; updateOutputs(); }
+  function updateJsAndSort(id, content, filename) {
+    const it = state.jsList.find((x) => x.id === id);
+    if (it) { it.content = content; if (filename) it.filename = filename; }
+    state.jsList = sortJsList(state.jsList);
+    render(); updateOutputs();
+  }
+  function addJsPanel() { state.jsList.push({ id: Date.now(), content:'', filename:`script${state.jsList.length + 1}.js` }); render(); updateOutputs(); }
+  function removeJsPanel(id) { state.jsList = state.jsList.filter((x) => x.id !== id); render(); updateOutputs(); }
+  function moveJsPanel(index, dir) {
+    const l = state.jsList;
+    if (dir === 'up' && index > 0) { const t = l[index - 1]; l[index - 1] = l[index]; l[index] = t; }
+    else if (dir === 'down' && index < l.length - 1) { const t = l[index + 1]; l[index + 1] = l[index]; l[index] = t; }
+    render(); updateOutputs();
+  }
+  function handleBulkImport(e) {
+    const files = Array.from(e.target.files);
+    if (!files.length) return;
+    const readAsText = (file) => new Promise((res) => { const r = new FileReader(); r.onload = (ev) => res({ name: file.name, text: ev.target.result }); r.readAsText(file); });
+    Promise.all(files.map(readAsText)).then((arr) => {
+      let jsFiles = [];
+      arr.forEach(({ name, text }) => {
+        const ext = name.split('.').pop().toLowerCase();
+        if (state.mode === 'compose') {
+          if (ext === 'html') { state.composeHtml = text; state.composeHtmlFilename = name; }
+          else if (ext === 'css') { state.composeCss = text; state.composeCssFilename = name; }
+          else if (ext === 'js') { jsFiles.push({ name, text }); }
+        } else if (state.mode === 'compose-js') {
+          if (ext === 'js' || ext === 'txt') { jsFiles.push({ name, text }); }
+        }
+      });
+      if (jsFiles.length) {
+        let newList;
+        if (state.jsList.length === 1 && state.jsList[0].content === '') {
+          newList = jsFiles.map((f, i) => ({ id: Date.now() + i, content: f.text, filename: f.name }));
+        } else {
+          newList = state.jsList.concat(jsFiles.map((f, i) => ({ id: Date.now() + i, content: f.text, filename: f.name })));
+        }
+        state.jsList = sortJsList(newList);
+      }
+      e.target.value = null;
+      render(); updateOutputs();
+    });
+  }
+  function handleModeToggle(newMode) {
+    if (newMode === state.mode) return;
+    if (newMode === 'compose' || newMode === 'compose-js') {
+      if (state.mode === 'decompose') {
+        const d = decomposeHtml(state.decomposeInput, state.decomposeCssFilename, state.decomposeJsFilename, state.removeComments);
+        state.composeHtml = d.html; state.composeCss = d.css;
+        state.jsList = [{ id: Date.now(), content: d.js, filename: state.decomposeJsFilename }];
+      }
+    } else if (newMode === 'decompose') {
+      if (state.mode === 'compose') {
+        state.decomposeInput = composeHtml(state.composeHtml, state.composeCss, state.jsList, state.composeCssFilename, state.removeComments);
+      }
+    }
+    state.mode = newMode;
+    render();
+  }
+
+  function buildHeader() {
+    const titleBlock = el('div', {}, [
+      el('h1', { class:'title' }, [ el('span', { class:'logo' }, ICONS.app), 'HTML ToolKit' ]),
+      el('p', { class:'subtitle' }, 'インラインHTMLの分解と、HTML/CSS/JSの結合を行うユーティリティ')
+    ]);
+    const cb = el('input', { type:'checkbox' }); cb.checked = state.removeComments;
+    cb.addEventListener('change', () => { state.removeComments = cb.checked; updateOutputs(); });
+    const commentToggle = el('label', { class:'toggle' }, [cb, 'コメント自動削除']);
+    const themeBtn = el('button', { class:'icon-toggle', title:'テーマ切替' }, state.theme === 'dark' ? ICONS.sun : ICONS.moon);
+    themeBtn.addEventListener('click', () => {
+      state.theme = state.theme === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', state.theme);
+      themeBtn.textContent = state.theme === 'dark' ? ICONS.sun : ICONS.moon;
+    });
+    const modes = el('div', { class:'modes' });
+    [['decompose', ICONS.decompose, 'HTML分解'], ['compose', ICONS.compose, 'HTML結合'], ['compose-js', ICONS.composeJs, 'JSのみ結合']]
+      .forEach(([m, ic, lbl]) => {
+        const b = el('button', { class:'mode-btn' + (state.mode === m ? ' active' : '') }, [ el('span', {}, ic), lbl ]);
+        b.addEventListener('click', () => handleModeToggle(m));
+        modes.appendChild(b);
+      });
+    const controls = el('div', { class:'controls' }, [commentToggle, themeBtn, modes]);
+    return el('div', { class:'header' }, [titleBlock, controls]);
+  }
+
+  function buildDecompose(grid) {
+    grid.appendChild(EditorPanel({
+      label:'入力HTML', icon: ICONS.input,
+      filename: state.decomposeInputFilename, onFilename: (v) => { state.decomposeInputFilename = v; },
+      initial: state.decomposeInput, placeholder:'ここに <style> や <script> を含むHTMLを貼り付けてください...',
+      accept:'.html,.txt', className:'fill',
+      onChange: (v) => { state.decomposeInput = v; updateOutputs(); },
+      onImport: (content, name) => { state.decomposeInput = content; if (name) state.decomposeInputFilename = name; render(); updateOutputs(); }
+    }));
+    const col = el('div', { class:'col' });
+    const dlAll = el('button', { class:'btn btn-blue', title:'3つのファイルを一括でダウンロード' }, [ el('span', {}, ICONS.output), '一括ダウンロード' ]);
+    dlAll.addEventListener('click', () => {
+      const d = decomposeHtml(state.decomposeInput, state.decomposeCssFilename, state.decomposeJsFilename, state.removeComments);
+      if (d.html) downloadFile(state.decomposeHtmlFilename, d.html);
+      if (d.css) setTimeout(() => downloadFile(state.decomposeCssFilename, d.css), 200);
+      if (d.js) setTimeout(() => downloadFile(state.decomposeJsFilename, d.js), 400);
+    });
+    col.appendChild(el('div', { class:'col-head' }, [ el('span', { class:'label' }, '抽出されたファイル'), dlAll ]));
+    col.appendChild(EditorPanel({ icon: ICONS.html, filename: state.decomposeHtmlFilename, onFilename: (v) => { state.decomposeHtmlFilename = v; updateOutputs(); }, readOnly:true, className:'flex1', compute: () => decomposeHtml(state.decomposeInput, state.decomposeCssFilename, state.decomposeJsFilename, state.removeComments).html }));
+    col.appendChild(EditorPanel({ icon: ICONS.css, filename: state.decomposeCssFilename, onFilename: (v) => { state.decomposeCssFilename = v; updateOutputs(); }, readOnly:true, className:'flex1', compute: () => decomposeHtml(state.decomposeInput, state.decomposeCssFilename, state.decomposeJsFilename, state.removeComments).css }));
+    col.appendChild(EditorPanel({ icon: ICONS.js, filename: state.decomposeJsFilename, onFilename: (v) => { state.decomposeJsFilename = v; updateOutputs(); }, readOnly:true, className:'flex1', compute: () => decomposeHtml(state.decomposeInput, state.decomposeCssFilename, state.decomposeJsFilename, state.removeComments).js }));
+    grid.appendChild(col);
+  }
+
+  function buildJsToolbar(accept) {
+    const sortBtn = el('button', { class:'btn btn-soft', title:'JSのimport文を解析して依存関係の順に並び替えます' }, [ el('span', {}, ICONS.sort), '自動並び替え' ]);
+    if (state.jsList.length <= 1) sortBtn.disabled = true;
+    sortBtn.addEventListener('click', () => { state.jsList = sortJsList(state.jsList); render(); updateOutputs(); });
+    const bulkFile = el('input', { class:'hidden', type:'file', multiple:'', accept });
+    bulkFile.addEventListener('change', (e) => handleBulkImport(e));
+    const bulkBtn = el('button', { class:'btn btn-green', title:'複数ファイルをまとめて読み込みます' }, [ el('span', {}, ICONS.bulk), '一括インポート' ]);
+    bulkBtn.addEventListener('click', () => bulkFile.click());
+    return el('div', { class:'controls' }, [sortBtn, bulkBtn, bulkFile]);
+  }
+
+  function jsPanel(js, index) {
+    return EditorPanel({
+      icon: ICONS.js, filename: js.filename, onFilename: (v) => updateJsFilename(js.id, v),
+      initial: js.content, placeholder:'JavaScriptコードを入力...', accept:'.js,.txt', className:'block',
+      showRemove: state.jsList.length > 1, onRemove: () => removeJsPanel(js.id),
+      showUp: index > 0, onUp: () => moveJsPanel(index, 'up'),
+      showDown: index < state.jsList.length - 1, onDown: () => moveJsPanel(index, 'down'),
+      onChange: (v) => updateJs(js.id, v),
+      onImport: (c, n) => updateJsAndSort(js.id, c, n)
+    });
+  }
+
+  function buildCompose(grid) {
+    const col = el('div', { class:'col scroll' });
+    col.appendChild(el('div', { class:'col-head' }, [ el('span', { class:'label' }, '結合するファイル群'), buildJsToolbar('.html,.css,.js,.txt') ]));
+    col.appendChild(EditorPanel({ icon: ICONS.html, filename: state.composeHtmlFilename, onFilename: (v) => { state.composeHtmlFilename = v; updateOutputs(); }, initial: state.composeHtml, placeholder:'HTMLコードを入力...', accept:'.html,.txt', className:'block', onChange: (v) => { state.composeHtml = v; updateOutputs(); }, onImport: (c, n) => { state.composeHtml = c; if (n) state.composeHtmlFilename = n; render(); updateOutputs(); } }));
+    col.appendChild(EditorPanel({ icon: ICONS.css, filename: state.composeCssFilename, onFilename: (v) => { state.composeCssFilename = v; updateOutputs(); }, initial: state.composeCss, placeholder:'CSSコードを入力...', accept:'.css,.txt', className:'block', onChange: (v) => { state.composeCss = v; updateOutputs(); }, onImport: (c, n) => { state.composeCss = c; if (n) state.composeCssFilename = n; render(); updateOutputs(); } }));
+    state.jsList.forEach((js, index) => col.appendChild(jsPanel(js, index)));
+    const addBtn = el('button', { class:'addbtn' }, [ el('span', {}, ICONS.add), 'JavaScriptファイルを追加' ]);
+    addBtn.addEventListener('click', addJsPanel);
+    col.appendChild(addBtn);
+    grid.appendChild(col);
+    grid.appendChild(EditorPanel({ label:'出力HTML', icon: ICONS.output, filename: state.composeOutputFilename, onFilename: (v) => { state.composeOutputFilename = v; }, readOnly:true, className:'fill', compute: () => composeHtml(state.composeHtml, state.composeCss, state.jsList, state.composeCssFilename, state.removeComments) }));
+  }
+
+  function buildComposeJs(grid) {
+    const col = el('div', { class:'col scroll' });
+    col.appendChild(el('div', { class:'col-head' }, [ el('span', { class:'label' }, '結合するJSファイル群'), buildJsToolbar('.js,.txt') ]));
+    state.jsList.forEach((js, index) => col.appendChild(jsPanel(js, index)));
+    const addBtn = el('button', { class:'addbtn' }, [ el('span', {}, ICONS.add), 'JavaScriptファイルを追加' ]);
+    addBtn.addEventListener('click', addJsPanel);
+    col.appendChild(addBtn);
+    grid.appendChild(col);
+    grid.appendChild(EditorPanel({ label:'出力JS', icon: ICONS.js, filename: state.composeJsOutputFilename, onFilename: (v) => { state.composeJsOutputFilename = v; }, readOnly:true, className:'fill', compute: () => composeJs(state.jsList, state.removeComments) }));
+  }
+
+  function render() {
+    currentPanels = [];
+    const root = document.getElementById('app');
+    root.innerHTML = '';
+    const wrap = el('div', { class:'wrap' });
+    wrap.appendChild(buildHeader());
+    const grid = el('div', { class:'grid' });
+    if (state.mode === 'decompose') buildDecompose(grid);
+    else if (state.mode === 'compose') buildCompose(grid);
+    else buildComposeJs(grid);
+    wrap.appendChild(grid);
+    root.appendChild(wrap);
+  }
+
+  /* ===== App ===== */
+  function init() {
+    document.documentElement.setAttribute('data-theme', state.theme);
+    render();
+    updateOutputs();
+  }
+  init();
+})();
+</script>
 </body>
 </html>
